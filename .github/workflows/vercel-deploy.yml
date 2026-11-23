@@ -10,8 +10,7 @@ on:
         type: choice
         options:
           - all
-          - client-1
-          - client-2
+          - janopriyo-shop
 
 jobs:
   prepare:
@@ -24,7 +23,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.target_client }}" != "all" ]; then
             echo 'clients=["${{ inputs.target_client }}"]' >> $GITHUB_OUTPUT
           else
-            echo 'clients=["client-1","client-2"]' >> $GITHUB_OUTPUT
+            echo 'clients=["janopriyo-shop"]' >> $GITHUB_OUTPUT
           fi
 
   deploy-vercel-production:

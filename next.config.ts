@@ -1,6 +1,36 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const dynamicR2Patterns: NonNullable<NonNullable<NextConfig["images"]>["remotePatterns"]> = [];
+
+if (process.env.NEXT_PUBLIC_R2_PUBLIC_URL) {
+  try {
+    const r2Host = new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL).hostname.toLowerCase();
+    if (r2Host) {
+      dynamicR2Patterns.push({
+        protocol: "https",
+        hostname: r2Host,
+        port: "",
+        pathname: "/**",
+      });
+    }
+  } catch {
+    // Ignore invalid URL
+  }
+}
+
+if (process.env.NEXT_PUBLIC_ROOT_DOMAIN) {
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN.trim().toLowerCase();
+  if (rootDomain) {
+    dynamicR2Patterns.push({
+      protocol: "https",
+      hostname: `*.${rootDomain}`,
+      port: "",
+      pathname: "/**",
+    });
+  }
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
@@ -73,24 +103,7 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'pub-b8cf9a6eef98412eb96f76754ef0edb7.r2.dev',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.rumasworld.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.rumasworld.com',
-        port: '',
-        pathname: '/**',
-      },
+      ...dynamicR2Patterns,
 
     ],
     qualities: [75, 80, 100],
