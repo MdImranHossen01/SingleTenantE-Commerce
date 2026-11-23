@@ -1,0 +1,1539 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Plus,
+  Trash,
+  Loader2,
+  ArrowLeft,
+  X,
+  PlusCircle,
+  RefreshCw,
+  Info
+} from 'lucide-react';
+
+const generateBaseSku = () => {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const dateStr = `${dd}${mm}${yyyy}`;
+  const randomNum = String(Math.floor(1 + Math.random() * 999)).padStart(3, '0');
+  return `RW-${dateStr}-${randomNum}`;
+};
+
+const getComputedVariantSku = (
+  baseSku: string | undefined,
+  colorIndex: number,
+  sizeIndex: number,
+  hasColorVariant: boolean
+) => {
+  const cleanBase = (baseSku && baseSku.trim()) ? baseSku.trim() : generateBaseSku();
+  if (hasColorVariant) {
+    return `${cleanBase}-c${colorIndex + 1}-S${sizeIndex + 1}`;
+  }
+  return `${cleanBase}-S${sizeIndex + 1}`;
+};
+
+import { toast } from 'sonner';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Image from 'next/image';
+
+import { slugify, sanitizeSlugInput } from '@/lib/slugify';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+const NovelEditor = dynamic(() => import('@/components/editor/NovelEditor'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full animate-pulse bg-muted rounded-md" />
+});
+
+const productSchema = z.object({
+  name: z.string().min(3, 'Name is required'),
+  slug: z.string().min(3, 'Slug is required'),
+  metaTitle: z.string().max(70, 'Meta title must not exceed 70 characters').optional(),
+  metaDescription: z.string().max(160, 'Meta description must not exceed 160 characters').optional(),
+  description: z.string().min(10, 'Description is required'),
+  price: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+  purchasePrice: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+  discountRate: z.union([z.coerce.number().min(0).max(100), z.literal('')]).optional(),
+  salePrice: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+  sku: z.string().optional(),
+  stock: z.union([z.coerce.number().int().min(0, 'Stock must be at least 0'), z.literal('')]).optional(),
+  categories: z.array(z.string()).min(1, 'Select at least one category'),
+  images: z.array(z.string()).default([]),
+  isFeatured: z.boolean(),
+  isNewArrival: z.boolean(),
+  isFlashSale: z.boolean().optional(),
+  isPublished: z.boolean(),
+  brand: z.string().optional(),
+  batchNumber: z.string().optional(),
+  expiryDate: z.string().optional(),
+  attributes: z.array(z.object({
+    key: z.string(),
+    value: z.string()
+  })),
+  variants: z.array(z.object({
+    color: z.string().optional(),
+    images: z.array(z.string()).default([]),
+    sizes: z.array(z.object({
+      size: z.string().optional(),
+      price: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+      purchasePrice: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+      discountRate: z.union([z.coerce.number().min(0).max(100), z.literal('')]).optional(),
+      salePrice: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+      stock: z.union([z.coerce.number().min(0), z.literal('')]).optional(),
+      sku: z.string().optional(),
+    })).default([]),
+  })).default([]),
+}).superRefine((data, ctx) => {
+  const hasVariants = data.variants && data.variants.some((v: any) => (v.sizes && v.sizes.length > 0) || (v.images && v.images.length > 0));
+
+  const hasMainImages = data.images && data.images.length > 0;
+  const hasVariantImages = data.variants && data.variants.some(v => v.images && v.images.length > 0);
+  if (!hasMainImages && !hasVariantImages) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Upload at least one image (either in Gallery Images or in a color variant)',
+      path: ['images'],
+    });
+  }
+
+  if (!hasVariants) {
+    const priceVal = data.price === '' || data.price === undefined ? 0 : Number(data.price);
+    if (!priceVal || priceVal <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Price is required and must be greater than zero',
+        path: ['price'],
+      });
+    }
+    const salePriceVal = data.salePrice === '' || data.salePrice === undefined ? undefined : Number(data.salePrice);
+    if (salePriceVal !== undefined && priceVal > 0 && salePriceVal > priceVal) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Discounted price cannot exceed price',
+        path: ['salePrice'],
+      });
+    }
+    if (!data.sku || data.sku.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'SKU is required (min 2 chars)',
+        path: ['sku'],
+      });
+    }
+  } else {
+    data.variants.forEach((variant, vIdx) => {
+      if (variant.sizes && variant.sizes.length > 0 && (!variant.images || variant.images.length === 0) && !hasMainImages) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Upload at least one image for this color variant or in Gallery Images',
+          path: ['variants', vIdx, 'images'],
+        });
+      }
+      (variant.sizes || []).forEach((size, sIdx) => {
+        const sizePrice = size.price === '' || size.price === undefined ? 0 : Number(size.price);
+        if (!sizePrice || sizePrice <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Price is required for each variant size',
+            path: ['variants', vIdx, 'sizes', sIdx, 'price'],
+          });
+        }
+        const sizeSalePrice = size.salePrice === '' || size.salePrice === undefined ? undefined : Number(size.salePrice);
+        if (sizeSalePrice !== undefined && sizePrice > 0 && sizeSalePrice > sizePrice) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Discounted price cannot exceed price',
+            path: ['variants', vIdx, 'sizes', sIdx, 'salePrice'],
+          });
+        }
+      });
+    });
+  }
+});
+
+type ProductFormValues = z.infer<typeof productSchema>;
+
+interface ProductFormProps {
+  initialData?: any;
+}
+
+export function ProductForm({ initialData }: ProductFormProps) {
+  const { t } = useLanguage();
+  const router = useRouter();
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const calculateDiscount = (price: number, salePrice?: number) => {
+    if (!price || !salePrice || salePrice >= price) return 0;
+    return Math.round((1 - salePrice / price) * 100);
+  };
+
+  const initialHasVariants = Boolean(initialData?.variants && initialData.variants.length > 0);
+
+  const defaultValues: ProductFormValues = {
+    name: initialData?.name || '',
+    slug: initialData?.slug || '',
+    metaTitle: initialData?.metaTitle || '',
+    metaDescription: initialData?.metaDescription || '',
+    description: initialData?.description || '',
+    price: initialHasVariants ? '' : (initialData?.price ?? ''),
+    purchasePrice: initialHasVariants ? '' : (initialData?.purchasePrice ?? ''),
+    discountRate: initialHasVariants ? '' : (calculateDiscount(initialData?.price, initialData?.salePrice) || ''),
+    salePrice: initialHasVariants ? '' : (initialData?.salePrice ?? ''),
+    sku: initialData?.sku || generateBaseSku(),
+    stock: initialHasVariants ? '' : (initialData?.stock ?? ''),
+    categories: initialData?.categories?.map((c: any) => typeof c === 'object' ? c._id : c) || [],
+    images: initialHasVariants ? [] : (initialData?.images || []),
+    isPublished: initialData?.isPublished ?? true,
+    isFeatured: initialData?.isFeatured ?? false,
+    isNewArrival: initialData?.isNewArrival ?? false,
+    isFlashSale: initialData?.isFlashSale ?? false,
+    brand: initialData?.brand?._id || initialData?.brand || '',
+    batchNumber: initialData?.batches?.[0]?.batchNumber || '',
+    expiryDate: (() => {
+      if (!initialData?.batches?.[0]?.expiryDate) return '';
+      try {
+        return new Date(initialData.batches[0].expiryDate).toISOString().split('T')[0];
+      } catch {
+        return '';
+      }
+    })(),
+    attributes: initialData?.attributes || [],
+    variants: (() => {
+      if (!initialData?.variants) return [];
+      const colorGroups: Record<string, { color: string; images: string[]; sizes: any[] }> = {};
+      initialData.variants.forEach((v: any) => {
+        const colorKey = v.color || '';
+        if (!colorGroups[colorKey]) {
+          const variantImages: string[] = [];
+          if (v.images && Array.isArray(v.images)) {
+            variantImages.push(...v.images);
+          } else if (v.image) {
+            variantImages.push(v.image);
+          }
+          colorGroups[colorKey] = {
+            color: v.color || '',
+            images: variantImages,
+            sizes: []
+          };
+        } else {
+          if (v.images && Array.isArray(v.images)) {
+            v.images.forEach((img: string) => {
+              if (!colorGroups[colorKey].images.includes(img)) {
+                colorGroups[colorKey].images.push(img);
+              }
+            });
+          } else if (v.image && !colorGroups[colorKey].images.includes(v.image)) {
+            colorGroups[colorKey].images.push(v.image);
+          }
+        }
+        colorGroups[colorKey].sizes.push({
+          size: v.size || '',
+          price: v.price ?? '',
+          purchasePrice: v.purchasePrice ?? '',
+          stock: v.stock ?? '',
+          discountRate: calculateDiscount(v.price, v.salePrice) || '',
+          salePrice: v.salePrice ?? '',
+          sku: v.sku || ''
+        });
+      });
+      return Object.values(colorGroups);
+    })() || [],
+  };
+
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema) as any,
+    defaultValues
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "attributes"
+  });
+
+  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
+    control: form.control,
+    name: "variants"
+  });
+
+  const hasVariants = variantFields.length > 0;
+
+  const syncAutoVariantSkus = (variantsList: any[]) => {
+    const baseSku = form.getValues('sku') || generateBaseSku();
+    const hasColorVariant = variantsList.length > 1 || variantsList.some(v => Boolean(v.color?.trim()));
+    variantsList.forEach((v, cIdx) => {
+      (v.sizes || []).forEach((sz: any, sIdx: number) => {
+        const currentSku = sz?.sku?.trim() || '';
+        const expectedWithColor = getComputedVariantSku(baseSku, cIdx, sIdx, true);
+        const expectedNoColor = getComputedVariantSku(baseSku, cIdx, sIdx, false);
+        if (!currentSku || currentSku === expectedWithColor || currentSku === expectedNoColor || currentSku.startsWith(`${baseSku}-`)) {
+          const newSku = getComputedVariantSku(baseSku, cIdx, sIdx, hasColorVariant);
+          if (currentSku !== newSku) {
+            form.setValue(`variants.${cIdx}.sizes.${sIdx}.sku`, newSku, { shouldDirty: true });
+          }
+        }
+      });
+    });
+  };
+
+  const handleAddColorVariant = () => {
+    // Immediately clean main gallery images and main pricing section when a variant is added
+    form.setValue('images', []);
+    form.setValue('price', '' as any);
+    form.setValue('purchasePrice', '' as any);
+    form.setValue('discountRate', undefined as any);
+    form.setValue('salePrice', '' as any);
+    form.setValue('stock', '' as any);
+
+    const currentVariants = form.getValues('variants') || [];
+    const nextColorIndex = currentVariants.length;
+    const baseSku = form.getValues('sku') || generateBaseSku();
+    const hasColorVariant = nextColorIndex > 0 || currentVariants.some(v => Boolean(v.color?.trim()));
+    const initialSku = getComputedVariantSku(baseSku, nextColorIndex, 0, hasColorVariant);
+
+    appendVariant({
+      color: '',
+      images: [],
+      sizes: [{ size: '', price: '', stock: '', sku: initialSku }]
+    });
+
+    // If a second variant was added, upgrade existing variant SKUs from -S1 to -c1-S1 automatically
+    if (nextColorIndex > 0) {
+      setTimeout(() => {
+        syncAutoVariantSkus(form.getValues('variants') || []);
+      }, 0);
+    }
+  };
+
+  const handleAddSize = (colorIndex: number) => {
+    const currentSizes = form.getValues(`variants.${colorIndex}.sizes`) || [];
+    const nextSizeIndex = currentSizes.length;
+    const allVariants = form.getValues('variants') || [];
+    const hasColorVariant = allVariants.length > 1 || allVariants.some(v => Boolean(v.color?.trim()));
+    const baseSku = form.getValues('sku') || generateBaseSku();
+    const autoSku = getComputedVariantSku(baseSku, colorIndex, nextSizeIndex, hasColorVariant);
+
+    form.setValue(`variants.${colorIndex}.sizes`, [
+      ...currentSizes,
+      { size: '', price: form.getValues('price') || '', stock: '', sku: autoSku }
+    ]);
+  };
+
+  const autoGenerateAllVariantSkus = () => {
+    const baseSku = form.getValues('sku') || generateBaseSku();
+    const allVariants = form.getValues('variants') || [];
+    const hasColorVariant = allVariants.length > 1 || allVariants.some(v => Boolean(v.color?.trim()));
+
+    allVariants.forEach((v, cIdx) => {
+      (v.sizes || []).forEach((_, sIdx) => {
+        const newSku = getComputedVariantSku(baseSku, cIdx, sIdx, hasColorVariant);
+        form.setValue(`variants.${cIdx}.sizes.${sIdx}.sku`, newSku, { shouldValidate: true, shouldDirty: true });
+      });
+    });
+    toast.success('All variant SKUs have been auto-generated');
+  };
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/categories');
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategories([]);
+        toast.error('Failed to load categories');
+      }
+    }
+    async function fetchBrands() {
+      try {
+        const res = await fetch('/api/brands');
+        if (!res.ok) throw new Error('Failed to fetch brands');
+        const data = await res.json();
+        setBrands(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+      }
+    }
+    fetchCategories();
+    fetchBrands();
+  }, []);
+
+  const nameValue = form.watch('name');
+  useEffect(() => {
+    if (nameValue && !initialData) {
+      form.setValue('slug', slugify(nameValue));
+    }
+  }, [nameValue, form, initialData]);
+
+  const onSubmit = async (values: ProductFormValues) => {
+    setLoading(true);
+    const baseSkuForSubmit = values.sku?.trim() || generateBaseSku();
+    const allVariantsForSubmit = values.variants || [];
+    const hasColorVariantSubmit = allVariantsForSubmit.length > 1 || allVariantsForSubmit.some((v: any) => Boolean(v.color?.trim()));
+
+    const flatVariants: any[] = [];
+    allVariantsForSubmit.forEach((cGroup: any, cIdx: number) => {
+      (cGroup.sizes || []).forEach((sizeInfo: any, sIdx: number) => {
+        const vPrice = sizeInfo.price === '' ? 0 : Number(sizeInfo.price);
+        const parsedVSale = sizeInfo.salePrice === '' || sizeInfo.salePrice === undefined || sizeInfo.salePrice === null ? undefined : Number(sizeInfo.salePrice);
+        const effectiveVSale = (parsedVSale !== undefined && parsedVSale > 0 && (vPrice === 0 || parsedVSale < vPrice)) ? parsedVSale : undefined;
+        const parsedVDisc = sizeInfo.discountRate === '' || isNaN(Number(sizeInfo.discountRate)) ? undefined : Number(sizeInfo.discountRate);
+        const effectiveVDisc = (effectiveVSale !== undefined && parsedVDisc !== undefined && parsedVDisc > 0 && parsedVDisc < 100) ? parsedVDisc : undefined;
+        const computedVariantSku = sizeInfo.sku?.trim() || getComputedVariantSku(baseSkuForSubmit, cIdx, sIdx, hasColorVariantSubmit);
+
+        flatVariants.push({
+          color: cGroup.color || '',
+          images: cGroup.images || [],
+          image: cGroup.images?.[0] || '', // Legacy support
+          size: sizeInfo.size || '',
+          price: vPrice,
+          purchasePrice: sizeInfo.purchasePrice === '' ? undefined : Number(sizeInfo.purchasePrice),
+          salePrice: effectiveVSale,
+          discountRate: effectiveVDisc,
+          stock: sizeInfo.stock === '' ? 0 : Number(sizeInfo.stock),
+          sku: computedVariantSku,
+        });
+      });
+    });
+
+    const hasVariantsSubmit = flatVariants.length > 0;
+    const firstVariant = hasVariantsSubmit ? flatVariants[0] : null;
+
+    let derivedPrice = values.price === '' ? 0 : Number(values.price);
+    let derivedSalePrice: number | undefined = undefined;
+    let derivedDiscountRate: number | undefined = undefined;
+    let derivedPurchasePrice = values.purchasePrice === '' ? undefined : Number(values.purchasePrice);
+    let derivedStock = values.stock === '' ? 0 : Number(values.stock);
+
+    if (hasVariantsSubmit && firstVariant) {
+      // STRICT RULE: If product has variants, ALL root pricing is strictly taken from the first variant!
+      derivedPrice = Number(firstVariant.price || 0);
+      const rawVSale = firstVariant.salePrice !== undefined && firstVariant.salePrice !== null ? Number(firstVariant.salePrice) : undefined;
+      if (rawVSale !== undefined && rawVSale > 0 && rawVSale < derivedPrice) {
+        derivedSalePrice = rawVSale;
+        derivedDiscountRate = firstVariant.discountRate !== undefined ? Number(firstVariant.discountRate) : Math.round((1 - rawVSale / derivedPrice) * 100);
+      } else {
+        derivedSalePrice = undefined;
+        derivedDiscountRate = undefined;
+      }
+      derivedPurchasePrice = firstVariant.purchasePrice !== undefined ? Number(firstVariant.purchasePrice) : undefined;
+      derivedStock = flatVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+    } else {
+      const parsedMainSale = values.salePrice === '' || values.salePrice === undefined || values.salePrice === null ? undefined : Number(values.salePrice);
+      if (parsedMainSale !== undefined && parsedMainSale > 0 && (derivedPrice === 0 || parsedMainSale < derivedPrice)) {
+        derivedSalePrice = parsedMainSale;
+        const parsedMainDisc = values.discountRate === '' || isNaN(Number(values.discountRate)) ? undefined : Number(values.discountRate);
+        derivedDiscountRate = (parsedMainDisc !== undefined && parsedMainDisc > 0 && parsedMainDisc < 100) ? parsedMainDisc : Math.round((1 - derivedSalePrice / derivedPrice) * 100);
+      } else {
+        derivedSalePrice = undefined;
+        derivedDiscountRate = undefined;
+      }
+    }
+
+    let finalImages = values.images || [];
+    if (hasVariantsSubmit) {
+      const allVariantImages = flatVariants.flatMap((v) => (v.images && v.images.length > 0 ? v.images : (v.image ? [v.image] : []))).filter(Boolean);
+      if (allVariantImages.length > 0) {
+        finalImages = Array.from(new Set(allVariantImages));
+      }
+    }
+
+    const batches = values.batchNumber
+      ? [{
+        batchNumber: values.batchNumber,
+        expiryDate: values.expiryDate ? new Date(values.expiryDate) : undefined,
+        stock: derivedStock,
+      }]
+      : [];
+
+    const cleanValues = {
+      ...values,
+      sku: baseSkuForSubmit,
+      images: finalImages,
+      brand: values.brand || null,
+      batches,
+      price: derivedPrice,
+      purchasePrice: derivedPurchasePrice,
+      salePrice: derivedSalePrice !== undefined ? derivedSalePrice : null,
+      discountRate: derivedDiscountRate !== undefined ? derivedDiscountRate : null,
+      stock: derivedStock,
+      variants: flatVariants,
+    };
+
+    try {
+      const url = initialData ? `/api/products/${initialData._id}` : '/api/products';
+      const method = initialData ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanValues),
+      });
+
+      if (response.ok) {
+        toast.success(`Product ${initialData ? 'updated' : 'created'} successfully`);
+        router.push('/admin/products');
+        router.refresh();
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Something went wrong');
+      }
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast.error('Failed to save product');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addImage = (url: string) => {
+    const currentImages = form.getValues('images');
+    form.setValue('images', [...currentImages, url], {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const removeImage = (url: string) => {
+    const currentImages = form.getValues('images');
+    form.setValue('images', currentImages.filter(i => i !== url), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const toggleCategory = (catId: string) => {
+    const currentCats = form.getValues('categories');
+    const category = categories.find(c => c._id === catId);
+    if (!category) return;
+
+    if (currentCats.includes(catId)) {
+      // Removing category
+      let newCats = currentCats.filter(id => id !== catId);
+
+      // If it's a main category (no parent), also remove its subcategories
+      if (!category.parentCategory) {
+        newCats = newCats.filter(id => {
+          const sub = categories.find(c => c._id === id);
+          const parentId = sub?.parentCategory?._id || sub?.parentCategory;
+          return parentId !== catId;
+        });
+      }
+
+      form.setValue('categories', newCats, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    } else {
+      // Adding category
+      form.setValue('categories', [...currentCats, catId], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  };
+
+  const selectedCats = form.watch('categories');
+  const mainCategories = categories.filter((cat) => !cat.parentCategory);
+  const selectedMainCategoryIds = mainCategories
+    .filter(mc => selectedCats.includes(mc._id))
+    .map(mc => mc._id);
+
+  // Validation Check: ensure at least one main category is selected
+  const hasMainCategory = selectedMainCategoryIds.length > 0;
+
+  return (
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          console.error('Form validation errors:', errors);
+          const hasVariantsErr = (form.getValues('variants') || []).length > 0;
+          if (hasVariantsErr) {
+            toast.error('Please fill in all mandatory variant details (Images, Price, and SKU for each size).');
+          } else {
+            toast.error('Please fix the form errors before saving.');
+          }
+        })}
+        className="space-y-8 pb-10"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {initialData ? t("products.form.edit_product") : t("products.form.add_product")}
+            </h1>
+          </div>
+          <Button type="submit" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {t("products.form.save_product")}
+          </Button>
+        </div>
+
+        <div className="max-w-5xl mx-auto w-full space-y-6">
+          {/* Product Information */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("products.form.product_name")}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={t("products.form.product_name") as string} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("products.form.slug")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="product-slug"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(sanitizeSlugInput(e.target.value));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sku"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>
+                          {t("products.form.sku")}
+                          {variantFields.length > 0
+                            ? <span className="ml-1 text-xs font-normal text-muted-foreground">(Optional)</span>
+                            : <span className="ml-1 text-xs font-normal text-destructive">*</span>
+                          }
+                        </FormLabel>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newBase = generateBaseSku();
+                            field.onChange(newBase);
+                            const allVariants = form.getValues('variants') || [];
+                            if (allVariants.length > 0) {
+                              const hasColorVariant = allVariants.length > 1 || allVariants.some(v => Boolean(v.color?.trim()));
+                              allVariants.forEach((v, cIdx) => {
+                                (v.sizes || []).forEach((_, sIdx) => {
+                                  const newSku = getComputedVariantSku(newBase, cIdx, sIdx, hasColorVariant);
+                                  form.setValue(`variants.${cIdx}.sizes.${sIdx}.sku`, newSku, { shouldValidate: true, shouldDirty: true });
+                                });
+                              });
+                            }
+                          }}
+                          className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium transition-colors"
+                          title="Auto-generate new SKU"
+                        >
+                          <RefreshCw className="size-3" />
+                          Auto
+                        </button>
+                      </div>
+                      <FormControl>
+                        <Input placeholder="RW-19112026-001" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="brand"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("products.brand") || "Brand"}</FormLabel>
+                      <Select
+                        value={field.value || 'none'}
+                        onValueChange={(val) => field.onChange(val === 'none' ? '' : val)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-10 w-full">
+                            <SelectValue placeholder="Select a brand (Optional)">
+                              {field.value && field.value !== 'none'
+                                ? brands.find((b) => b._id === field.value)?.name || 'Select a brand (Optional)'
+                                : 'Select a brand (Optional)'}
+                            </SelectValue>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None / No Brand</SelectItem>
+                          {brands.map((b) => (
+                            <SelectItem key={b._id} value={b._id}>
+                              {b.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              {/* Batch & Expiry Tracking (Independent of Variants) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="batchNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Batch Number
+                        <span className="text-[11px] font-normal text-muted-foreground">(Optional)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. BATCH-001" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormDescription className="text-xs">Identify the inventory batch</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expiryDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Expiry Date
+                        <span className="text-[11px] font-normal text-muted-foreground">(Optional)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormDescription className="text-xs">Product batch expiration date</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* SEO Meta Fields (Before Description) */}
+              <FormField
+                control={form.control}
+                name="metaTitle"
+                render={({ field }) => {
+                  const charCount = (field.value || '').length;
+                  return (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="flex items-center gap-1.5">
+                          Meta Title
+                          <span className="text-[11px] font-normal text-muted-foreground">(SEO)</span>
+                        </FormLabel>
+                        <span className={`text-[11px] font-mono ${charCount > 70 ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
+                          {charCount}/70
+                        </span>
+                      </div>
+                      <FormControl>
+                        <Input
+                          placeholder="SEO title for search engines (max 70 chars)"
+                          maxLength={70}
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              <FormField
+                control={form.control}
+                name="metaDescription"
+                render={({ field }) => {
+                  const charCount = (field.value || '').length;
+                  return (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="flex items-center gap-1.5">
+                          Meta Description
+                          <span className="text-[11px] font-normal text-muted-foreground">(SEO)</span>
+                        </FormLabel>
+                        <span className={`text-[11px] font-mono ${charCount > 160 ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
+                          {charCount}/160
+                        </span>
+                      </div>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Brief summary shown in Google search results (max 160 chars)"
+                          maxLength={160}
+                          rows={2}
+                          className="resize-none"
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("products.form.description")}</FormLabel>
+                    <FormControl>
+                      <div className="prose-sm max-w-none">
+                        <NovelEditor
+                          initialValue={(() => {
+                            try {
+                              return field.value ? JSON.parse(field.value) : undefined;
+                            } catch {
+                              // Fallback for plain text description
+                              return {
+                                type: 'doc',
+                                content: [{ type: 'paragraph', content: [{ type: 'text', text: field.value }] }]
+                              };
+                            }
+                          })()}
+                          onChange={field.onChange}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className={hasVariants ? "border-dashed bg-muted/20" : ""}>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-base font-bold">{t("products.form.gallery_images")}</Label>
+                  {hasVariants && (
+                    <span className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full font-medium">
+                      Disabled (Variants Active)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {hasVariants ? (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/15 p-4 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-sm text-amber-800 dark:text-amber-300">
+                    <Info className="h-5 w-5 shrink-0 text-amber-600" />
+                    <span>গ্যালারি ইমেজ আপলোড বন্ধ (Variants Active — Upload Disabled)</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    <strong>নির্দেশনা:</strong> প্রোডাক্টে ভ্যারিয়েন্ট যোগ করা হয়েছে। নিয়ম অনুযায়ী ভ্যারিয়েন্ট থাকলে মূল গ্যালারি ইমেজ আপলোড করা যাবে না। ভ্যারিয়েন্ট যুক্ত করার সাথে সাথে মূল গ্যালারি ইমেজ এবং মূল প্রাইসিং সেকশন স্বয়ংক্রিয়ভাবে সম্পূর্ণ মুছে (Clean) নিষ্ক্রিয় (Disable) করা হয়েছে। প্রোডাক্টের ছবিগুলো অনুগ্রহ করে নিচের প্রতিটি <strong>Color Variant</strong>-এর নিজস্ব ইমেজ সেকশনে আপলোড করুন।
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Variant Rule Instruction Banner */}
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                    <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="font-bold block">জরুরি নির্দেশনা:</span>
+                      <span>প্রোডাক্টে কালার/সাইজ ভ্যারিয়েন্ট থাকলে মূল গ্যালারি ইমেজ আপলোড করা যাবে না। নিচে <strong>ভ্যারিয়েন্ট যোগ করার সাথে সাথে মূল গ্যালারি ইমেজ এবং মূল প্রাইসিং সেকশন তাৎক্ষণিকভাবে মুছে (Clean) নিষ্ক্রিয় (Disable)</strong> হয়ে যাবে এবং ছবিগুলো প্রতিটি Color Variant-এর ভেতরে আপলোড করতে হবে।</span>
+                    </div>
+                  </div>
+
+                  {/* Image Upload Best Practice Guideline */}
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs space-y-1.5 text-muted-foreground">
+                    <div className="flex items-center gap-1.5 font-semibold text-primary">
+                      <Info className="h-4 w-4 shrink-0" />
+                      <span>Image Upload Guidelines (For Best Quality & Zoom)</span>
+                    </div>
+                    <ul className="grid grid-cols-1 md:grid-cols-3 gap-x-3 gap-y-1 list-disc list-inside text-[11px] leading-relaxed">
+                      <li><strong>Max Size:</strong> Maximum file size is <strong>1 MB</strong> per image.</li>
+                      <li><strong>Ratio:</strong> 1:1 square or 3:4 portrait ratio is recommended.</li>
+                      <li><strong>Clean Background:</strong> Use bright lighting with neutral/light background for true colors.</li>
+                    </ul>
+                    <div className="flex items-center gap-1.5 text-destructive font-semibold text-[11px] bg-destructive/10 border border-destructive/20 rounded-md px-2.5 py-1.5 mt-1">
+                      <span className="font-bold uppercase tracking-wider text-[10px] bg-destructive text-white px-1.5 py-0.5 rounded">Max 1 MB • WebP</span>
+                      <span>Upload in <strong>.webp</strong> format (Max 1 MB) to ensure 100% original sharpness, zero quality loss, and instant loading!</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    {form.watch('images').map((url, index) => (
+                      <div key={`${url}-${index}`} className="relative aspect-square rounded-md overflow-hidden border bg-muted">
+                        <Image
+                          src={url}
+                          alt={`Product image ${index + 1}`}
+                          fill
+                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                          className="object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(url)}
+                          className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 z-10"
+                          aria-label={`Remove product image ${index + 1}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <ImageUpload onUpload={addImage} compact />
+                  </div>
+                  {form.formState.errors.images?.message && (
+                    <p className="text-[0.8rem] font-medium text-destructive">
+                      {form.formState.errors.images.message}
+                    </p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>{t("products.form.attributes")}</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ key: '', value: '' })}>
+                  <Plus className="mr-2 h-4 w-4" /> {t("products.form.add_attribute")}
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {fields.map((item, index) => (
+                  <div key={item.id} className="flex gap-4 items-end">
+                    <div className="flex-1">
+                      <Label>{t("products.form.label")}</Label>
+                      <Input {...form.register(`attributes.${index}.key` as const)} placeholder="e.g. Material" />
+                    </div>
+                    <div className="flex-1">
+                      <Label>{t("products.form.value")}</Label>
+                      <Input {...form.register(`attributes.${index}.value` as const)} placeholder="e.g. Cotton" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 shadow-sm overflow-hidden">
+            <div className="bg-primary/5 px-4 sm:px-6 py-4 border-b border-primary/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+              <div>
+                <h3 className="text-lg font-bold text-primary flex items-center gap-2 whitespace-nowrap">
+                  <PlusCircle className="h-5 w-5 shrink-0" />
+                  {t("products.form.variation_manager")}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("products.form.variation_manager_desc")}</p>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="bg-background hover:bg-muted text-xs transition-all border-primary/20 shrink-0"
+                  onClick={autoGenerateAllVariantSkus}
+                  title="Auto-generate or sync SKUs for all variations"
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5 text-primary" /> Auto-Fill SKUs
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto bg-background hover:bg-primary hover:text-white transition-all border-primary/20 shrink-0"
+                  onClick={handleAddColorVariant}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> {t("products.form.add_color_variant")}
+                </Button>
+              </div>
+            </div>
+            <CardContent className="p-6">
+              {variantFields.length === 0 ? (
+                <div className="text-center py-10 border-2 border-dashed border-muted rounded-xl text-muted-foreground italic text-sm">
+                  {t("products.form.no_variations_added")}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {variantFields.map((field, colorIndex) => {
+                    const colorImages = form.watch(`variants.${colorIndex}.images`) || [];
+
+                    return (
+                      <div key={field.id} className="border border-muted rounded-xl p-4 md:p-6 bg-muted/10 relative space-y-6">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removeVariant(colorIndex);
+                            setTimeout(() => {
+                              syncAutoVariantSkus(form.getValues('variants') || []);
+                            }, 0);
+                          }}
+                          className="absolute top-4 right-4 text-muted-foreground hover:text-destructive transition-colors p-1"
+                          title="Delete Color Variant"
+                        >
+                          <Trash className="h-5 w-5" />
+                        </button>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                          {/* Color Input */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-bold">
+                              {t("products.form.color_name")} <span className="text-xs font-normal text-muted-foreground">(Leave blank if no color variant)</span>
+                            </Label>
+                            <Input
+                              {...form.register(`variants.${colorIndex}.color` as const, {
+                                onChange: () => {
+                                  setTimeout(() => {
+                                    syncAutoVariantSkus(form.getValues('variants') || []);
+                                  }, 0);
+                                }
+                              })}
+                              placeholder="e.g. Yellow"
+                              className="h-10 bg-background"
+                            />
+                          </div>
+
+                          {/* Images Upload */}
+                          <div className="lg:col-span-2 space-y-2">
+                            <Label className="text-sm font-bold">{t("products.form.color_images")}</Label>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {colorImages.map((imgUrl: string, imgIdx: number) => (
+                                <div key={imgIdx} className="relative h-16 w-16 rounded-lg overflow-hidden border bg-background group">
+                                  <Image
+                                    src={imgUrl}
+                                    alt=""
+                                    fill
+                                    className="object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedImages = [...colorImages];
+                                      updatedImages.splice(imgIdx, 1);
+                                      form.setValue(`variants.${colorIndex}.images`, updatedImages);
+                                    }}
+                                    className="absolute top-0.5 right-0.5 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              <ImageUpload
+                                onUpload={(url) => {
+                                  form.setValue(`variants.${colorIndex}.images`, [...colorImages, url]);
+                                  form.trigger(`variants.${colorIndex}.images` as any);
+                                }}
+                                compact
+                                className="h-16 w-16"
+                              />
+                            </div>
+                            {(form.formState.errors as any)?.variants?.[colorIndex]?.images && (
+                              <p className="text-xs text-destructive mt-1">
+                                {(form.formState.errors as any)?.variants?.[colorIndex]?.images?.message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Sizes List under this color */}
+                        <div className="space-y-4 pt-4 border-t border-muted/50">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("products.form.sizes_pricing")}</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAddSize(colorIndex)}
+                            >
+                              <Plus className="mr-1.5 h-3.5 w-3.5" /> {t("products.form.add_size")}
+                            </Button>
+                          </div>
+
+                          <div className="space-y-4">
+                            {((form.watch(`variants.${colorIndex}.sizes`) as any[]) || []).map((sizeField, sizeIndex) => {
+                              return (
+                                <div key={sizeIndex} className="border border-muted/40 rounded-lg p-4 bg-background relative space-y-4">
+                                  {/* Delete size button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentSizes = form.getValues(`variants.${colorIndex}.sizes`) || [];
+                                      const updatedSizes = [...currentSizes];
+                                      updatedSizes.splice(sizeIndex, 1);
+                                      form.setValue(`variants.${colorIndex}.sizes`, updatedSizes);
+                                    }}
+                                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors p-1"
+                                    title="Remove Size"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+
+                                  {/* 2 Row Layout */}
+                                  {/* Row 1: Size, Purchase Price, Stock */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">{t("products.form.size")}</Label>
+                                      <Input
+                                        {...form.register(`variants.${colorIndex}.sizes.${sizeIndex}.size` as const)}
+                                        placeholder="Size"
+                                        className="h-9 mt-1"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">{t("products.form.purchase_tk") || "Purchase (Tk)"}</Label>
+                                      <Input
+                                        type="number"
+                                        value={form.watch(`variants.${colorIndex}.sizes.${sizeIndex}.purchasePrice`) ?? ''}
+                                        className="h-9 mt-1"
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
+                                          form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.purchasePrice`, val);
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">{t("products.form.stock")}</Label>
+                                      <Input
+                                        type="number"
+                                        value={form.watch(`variants.${colorIndex}.sizes.${sizeIndex}.stock`) ?? ''}
+                                        className="h-9 mt-1"
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
+                                          form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.stock`, val);
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Row 2: Sale Price, Regular Price, Discount Rate (%), SKU */}
+                                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">{t("products.form.sale_price_tk")}</Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Optional"
+                                        value={form.watch(`variants.${colorIndex}.sizes.${sizeIndex}.salePrice`) ?? ''}
+                                        className="h-9 mt-1"
+                                        onChange={(e) => {
+                                          const sale = e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0);
+                                          form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.salePrice`, sale);
+                                          const prc = form.getValues(`variants.${colorIndex}.sizes.${sizeIndex}.price`) || 0;
+                                          if (prc > 0 && sale !== undefined && sale > 0 && sale < prc) {
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.discountRate`, Math.round((1 - sale / prc) * 100));
+                                          } else {
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.discountRate`, undefined);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">
+                                        {t("products.form.price_tk")} <span className="text-destructive">*</span>
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        value={form.watch(`variants.${colorIndex}.sizes.${sizeIndex}.price`) ?? ''}
+                                        className={`h-9 mt-1 ${(form.formState.errors as any)?.variants?.[colorIndex]?.sizes?.[sizeIndex]?.price
+                                          ? 'border-destructive focus-visible:ring-destructive'
+                                          : ''
+                                        }`}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
+                                          form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.price`, val, { shouldValidate: form.formState.isSubmitted });
+                                          const disc = form.getValues(`variants.${colorIndex}.sizes.${sizeIndex}.discountRate`) || 0;
+                                          if (disc > 0 && val !== '') {
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.salePrice`, Math.round(val * (1 - disc / 100)));
+                                          }
+                                        }}
+                                      />
+                                      {(form.formState.errors as any)?.variants?.[colorIndex]?.sizes?.[sizeIndex]?.price && (
+                                        <p className="text-[0.75rem] font-medium text-destructive mt-1">
+                                          {(form.formState.errors as any)?.variants?.[colorIndex]?.sizes?.[sizeIndex]?.price?.message}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs font-medium text-muted-foreground">{t("products.form.disc_percent")}</Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={form.watch(`variants.${colorIndex}.sizes.${sizeIndex}.discountRate`) ?? ''}
+                                        className="h-9 mt-1"
+                                        onChange={(e) => {
+                                          const disc = e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0);
+                                          form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.discountRate`, disc);
+                                          const prc = form.getValues(`variants.${colorIndex}.sizes.${sizeIndex}.price`) || 0;
+                                          if (prc > 0 && disc !== undefined) {
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.salePrice`, Math.round(prc * (1 - disc / 100)));
+                                          } else {
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.salePrice`, undefined);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="col-span-2">
+                                      <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-medium text-muted-foreground">
+                                          {t("products.form.sku")} <span className="text-destructive">*</span>
+                                        </Label>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const baseSku = form.getValues('sku') || generateBaseSku();
+                                            const allVariants = form.getValues('variants') || [];
+                                            const hasColorVariant = allVariants.length > 1 || allVariants.some(v => Boolean(v.color?.trim()));
+                                            const generated = getComputedVariantSku(baseSku, colorIndex, sizeIndex, hasColorVariant);
+                                            form.setValue(`variants.${colorIndex}.sizes.${sizeIndex}.sku`, generated, { shouldDirty: true, shouldValidate: true });
+                                          }}
+                                          className="text-[10px] text-primary hover:underline flex items-center gap-0.5 font-medium transition-colors"
+                                          title="Auto generate variant SKU"
+                                        >
+                                          <RefreshCw className="size-2.5" />
+                                          Auto
+                                        </button>
+                                      </div>
+                                      <Input
+                                        {...form.register(`variants.${colorIndex}.sizes.${sizeIndex}.sku` as const)}
+                                        placeholder="SKU"
+                                        className="h-9 mt-1"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className={hasVariants ? "border-dashed bg-muted/20" : ""}>
+            <CardContent className="pt-6">
+              {hasVariants && (
+                <div className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs sm:text-sm leading-relaxed space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <span className="inline-block w-4 h-4 rounded-full bg-amber-500 text-white text-[11px] text-center font-bold">i</span>
+                    মূল প্রাইসিং ও স্টক সেকশন বন্ধ (Variants Active — Cleaned & Disabled)
+                  </p>
+                  <p className="text-muted-foreground pl-5.5">
+                    যেহেতু প্রোডাক্টটিতে কালার/সাইজ ভ্যারিয়েন্ট যুক্ত করা হয়েছে, তাই মূল প্রাইসিং ও স্টক সেকশনটি সম্পূর্ণ মুছে লক করা হয়েছে। প্রতিটি সাইজ/ভ্যারিয়েন্টের মূল্য, ডিসকাউন্ট এবং স্টক উপরের Product Variants সেকশনে নির্ধারণ করুন। ১ম ভ্যারিয়েন্টের মূল্যই মূল প্রোডাক্ট কার্ড ও কুইক ভিউতে ব্যবহৃত হবে।
+                  </p>
+                </div>
+              )}
+              <div className={hasVariants ? "opacity-50 pointer-events-none select-none" : ""}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("products.form.regular_price_tk")}
+                          {hasVariants && <span className="ml-1 text-xs font-normal text-muted-foreground">(Locked - Driven by variants)</span>}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder={hasVariants ? "Disabled" : "0.00"}
+                            disabled={hasVariants}
+                            {...field}
+                            value={hasVariants ? '' : (field.value ?? '')}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
+                              field.onChange(value);
+                              const prc = value === '' ? 0 : value;
+                              const discount = form.getValues('discountRate') || 0;
+                              if (discount > 0 && prc > 0) {
+                                const newSale = prc * (1 - discount / 100);
+                                form.setValue('salePrice', Math.round(newSale));
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="purchasePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("products.form.purchase_price_tk")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder={hasVariants ? "Disabled" : "0.00"}
+                            disabled={hasVariants}
+                            {...field}
+                            value={hasVariants ? '' : (field.value ?? '')}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
+                              field.onChange(value);
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="discountRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("products.form.discount_percent")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder={hasVariants ? "Disabled" : (!(Number(form.watch('price')) > 0) ? '-' : '0')}
+                            disabled={hasVariants || !(Number(form.watch('price')) > 0)}
+                            className="disabled:opacity-50 disabled:cursor-not-allowed"
+                            {...field}
+                            value={hasVariants ? '' : (field.value || '')}
+                            onChange={(e) => {
+                              const discount = e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0);
+                              field.onChange(discount);
+                              const price = form.getValues('price') || 0;
+                              if (price > 0 && discount !== undefined) {
+                                const newSale = price * (1 - discount / 100);
+                                form.setValue('salePrice', Math.round(newSale));
+                              } else {
+                                form.setValue('salePrice', undefined);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="salePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("products.form.sale_price_tk")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder={hasVariants ? "Disabled" : (!(Number(form.watch('price')) > 0) ? '-' : '0.00')}
+                            disabled={hasVariants || !(Number(form.watch('price')) > 0)}
+                            className="disabled:opacity-50 disabled:cursor-not-allowed"
+                            {...field}
+                            value={hasVariants ? '' : (field.value || '')}
+                            onChange={(e) => {
+                              const rawVal = e.target.value;
+                              const price = form.getValues('price') || 0;
+                              if (rawVal === '') {
+                                field.onChange('');
+                                form.setValue('discountRate', undefined);
+                                return;
+                              }
+                              let sale = parseFloat(rawVal) || 0;
+                              if (price > 0 && sale > price) {
+                                sale = price;
+                              }
+                              field.onChange(sale);
+                              if (price > 0 && sale > 0 && sale < price) {
+                                form.setValue('discountRate', Math.round((1 - sale / price) * 100));
+                              } else {
+                                form.setValue('discountRate', undefined);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="mt-6 max-w-sm">
+                  <FormField
+                    control={form.control}
+                    name="stock"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("products.form.total_stock_quantity")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder={hasVariants ? "Disabled" : "0"}
+                            disabled={hasVariants}
+                            {...field}
+                            value={hasVariants ? '' : (field.value ?? '')}
+                            onChange={(e) => field.onChange(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
+                          />
+                        </FormControl>
+                        <FormDescription>{t("products.form.physical_stock")}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-bold">{t("products.form.product_category")}</Label>
+                <span className="text-[10px] text-destructive uppercase font-bold">{t("products.form.required")}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                {mainCategories.map((mainCat) => (
+                  <Badge
+                    key={mainCat._id}
+                    variant={selectedCats.includes(mainCat._id) ? 'default' : 'outline'}
+                    className="cursor-pointer py-1.5 px-4 text-sm"
+                    onClick={() => toggleCategory(mainCat._id)}
+                  >
+                    {mainCat.name}
+                  </Badge>
+                ))}
+              </div>
+              {!hasMainCategory && form.formState.isSubmitted && (
+                <p className="text-[0.8rem] font-medium text-destructive">
+                  {t("products.form.select_one_category")}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-bold">{t("products.form.sub_category")}</Label>
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">{t("products.form.optional")}</span>
+              </div>
+              <div className="space-y-4 pt-2">
+                {selectedMainCategoryIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {categories
+                      .filter((sub) => {
+                        const parentId = sub.parentCategory?._id || sub.parentCategory;
+                        return selectedMainCategoryIds.includes(parentId);
+                      })
+                      .map((subCat) => (
+                        <Badge
+                          key={subCat._id}
+                          variant={selectedCats.includes(subCat._id) ? 'default' : 'outline'}
+                          className="cursor-pointer py-1 px-3 text-xs"
+                          onClick={() => toggleCategory(subCat._id)}
+                        >
+                          {subCat.name}
+                        </Badge>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    {t("products.form.select_category_to_see_sub")}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="featured">{t("products.form.featured_product")}</Label>
+                <input
+                  type="checkbox"
+                  id="featured"
+                  {...form.register('isFeatured')}
+                  className="h-4 w-4 accent-primary cursor-pointer hover:scale-110 transition-transform"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="new-arrival">{t("products.form.new_arrival")}</Label>
+                <input
+                  type="checkbox"
+                  id="new-arrival"
+                  {...form.register('isNewArrival')}
+                  className="h-4 w-4 accent-primary cursor-pointer hover:scale-110 transition-transform"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="flash-sale">{t("products.form.flash_sale")}</Label>
+                <input
+                  type="checkbox"
+                  id="flash-sale"
+                  {...form.register('isFlashSale')}
+                  className="h-4 w-4 accent-primary cursor-pointer hover:scale-110 transition-transform"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="published">{t("products.form.published")}</Label>
+                <input
+                  type="checkbox"
+                  id="published"
+                  {...form.register('isPublished')}
+                  className="h-4 w-4"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
