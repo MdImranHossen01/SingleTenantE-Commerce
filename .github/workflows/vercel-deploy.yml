@@ -1,36 +1,76 @@
-name: Deploy RumasWorld to Vercel (Zero Build Cost)
+name: Deploy SingleTenant Master to Vercel (Zero Build Cost)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
-
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-  NODE_OPTIONS: --max-old-space-size=6144
+    inputs:
+      target_client:
+        description: 'কোন ক্লায়েন্ট ডিপ্লয় করতে চান? (all = সবাই)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - client-1
+          - client-2
 
 jobs:
-  deploy-vercel-production:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      clients: ${{ steps.set-matrix.outputs.clients }}
     steps:
+      - id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.target_client }}" != "all" ]; then
+            echo 'clients=["${{ inputs.target_client }}"]' >> $GITHUB_OUTPUT
+          else
+            echo 'clients=["client-1","client-2"]' >> $GITHUB_OUTPUT
+          fi
+
+  deploy-vercel-production:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: ${{ fromJson(needs.prepare.outputs.clients) }}
+    environment: ${{ matrix.client }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Check Client Configuration
+        id: check
+        run: |
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Skipping ${{ matrix.client }} — VERCEL_PROJECT_ID not set in this Environment."
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
+        if: steps.check.outputs.configured == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.check.outputs.configured == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
       - name: Install Vercel CLI
+        if: steps.check.outputs.configured == 'true'
         run: npm install --global vercel@latest
 
       - name: Pull Vercel Production Environment
+        if: steps.check.outputs.configured == 'true'
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Sync ENV_FILE to Vercel Production & Build Env (Optional)
+        if: steps.check.outputs.configured == 'true'
         env:
           ENV_FILE: ${{ secrets.ENV_FILE }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -150,12 +190,15 @@ jobs:
           EOF
 
       - name: Build Project on GitHub Runner ($0 Vercel Build Cost)
+        if: steps.check.outputs.configured == 'true'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Prebuilt Artifacts to Vercel Production
+        if: steps.check.outputs.configured == 'true'
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Auto-Purge Cloudflare Cache (Optional)
+        if: steps.check.outputs.configured == 'true'
         env:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
