@@ -41,7 +41,7 @@ export default async function PublicLayout({ children }: { children: React.React
       {ui.layout !== 'v2' && ui.layout !== 'aarong' && ui.navbar !== 'aarong' && <Marquee marqueeText={marqueeText} />}
       <Navbar style={ui.navbar} />
       <main className="flex-1">{children}</main>
-      <div className="md:pb-0">
+      <div className="pb-16 md:pb-0">
         <Footer style={ui.footer} />
       </div>
       <ScrollToTop />
