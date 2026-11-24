@@ -5,6 +5,8 @@ import React, { createContext, useContext } from 'react';
 interface SettingsContextType {
   brandName?: string;
   logoUrl?: string;
+  marqueeText?: string;
+  categories?: any[];
   freeDeliveryThreshold?: number;
   deliveryChargeInsideDhaka?: number;
   deliveryChargeOutsideDhaka?: number;

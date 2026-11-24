@@ -237,14 +237,16 @@ export function AarongPromoBanners({ settings: propSettings }: { settings?: any 
     <section className="w-full bg-background py-1">
       <div className="w-full px-4 lg:px-6">
         <div
-          className={`grid grid-cols-1 ${
-            visibleSlots.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'
-          } gap-2 lg:gap-3`}
+          className={
+            visibleSlots.length > 1
+              ? 'grid grid-cols-1 md:grid-cols-2 gap-2 lg:gap-3'
+              : 'w-full md:max-w-[calc(50%-0.375rem)] md:mx-auto'
+          }
         >
           {visibleSlots.map(({ key, label, item, active }) => (
             <div
               key={key}
-              className="group relative block aspect-[4/3] sm:aspect-[16/10] md:aspect-[4/3] lg:aspect-[16/11] xl:aspect-[16/10] overflow-hidden bg-muted"
+              className="group relative block w-full aspect-[16/10] overflow-hidden bg-muted"
             >
               {/* Top-Left 3-Dot Admin Action Button */}
               {isAdmin && (
@@ -366,13 +368,21 @@ export function AarongPromoBanners({ settings: propSettings }: { settings?: any 
 
           <form onSubmit={handleSaveModal} className="space-y-4">
             <div className="space-y-2">
-              <Label>Banner Image</Label>
+              <div className="flex items-center justify-between">
+                <Label>Banner Image</Label>
+                <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  16:10 Ratio • 1600×1000px (or 800×500px)
+                </span>
+              </div>
               <ImageUpload
                 value={formImage}
                 onUpload={(url) => setFormImage(url)}
                 folder="banners"
                 className="aspect-[16/10] w-full"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Recommended size: <strong>1600×1000px</strong> (or <strong>800×500px</strong>) in <strong>16:10</strong> aspect ratio (WebP format, Max 1MB).
+              </p>
             </div>
 
             <div className="space-y-2">

@@ -84,13 +84,17 @@ export default function NavbarV2() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch Categories for Mobile
+  // Fetch Categories for Mobile (only if not already provided via server cache)
   useEffect(() => {
+    if (settings?.categories) {
+      setCategories(settings.categories.filter((c: any) => c.isActive !== false && !c.parentCategory));
+      return;
+    }
     fetch('/api/categories')
       .then(res => res.json())
       .then(data => setCategories(data.filter((c: any) => c.isActive && !c.parentCategory)))
       .catch(err => console.error('Failed to fetch categories', err));
-  }, []);
+  }, [settings?.categories]);
 
   // Fetch Profile for Wallet Balance
   useEffect(() => {

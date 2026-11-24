@@ -46,11 +46,15 @@ export default function NavbarV3() {
   const wishlistCount = useAppSelector((state) => state.wishlist.items.length);
 
   useEffect(() => {
+    if (settings?.categories) {
+      setCategories(settings.categories.filter((c: any) => c.isActive !== false && !c.parentCategory));
+      return;
+    }
     fetch('/api/categories')
       .then(res => res.json())
       .then(data => setCategories(data.filter((c: any) => c.isActive && !c.parentCategory)))
       .catch(err => console.error('Failed to fetch categories', err));
-  }, []);
+  }, [settings?.categories]);
 
   useEffect(() => {
     if (session) {

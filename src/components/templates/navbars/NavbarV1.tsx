@@ -73,11 +73,17 @@ export default function Navbar() {
   const { items: wishlistItems } = useAppSelector((state) => state.wishlist);
   const settings = useSettings();
 
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>(() =>
+    (settings?.categories || []).filter((c: any) => c.isActive !== false)
+  );
   const [profile, setProfile] = useState<any>(null);
 
 
   useEffect(() => {
+    if (settings?.categories) {
+      setCategories(settings.categories.filter((c: any) => c.isActive !== false));
+      return;
+    }
     const controller = new AbortController();
     async function fetchCats() {
       try {
@@ -94,7 +100,7 @@ export default function Navbar() {
     }
     fetchCats();
     return () => controller.abort();
-  }, []);
+  }, [settings?.categories]);
 
   useEffect(() => {
     let isMounted = true;
