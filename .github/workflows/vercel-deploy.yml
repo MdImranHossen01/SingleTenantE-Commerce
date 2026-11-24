@@ -196,17 +196,40 @@ jobs:
         if: steps.check.outputs.configured == 'true'
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Auto-Purge Cloudflare Cache (Optional)
+      - name: Auto-Purge Cloudflare Cache
         if: steps.check.outputs.configured == 'true'
         env:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
-          if [ -n "$CLOUDFLARE_ZONE_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          # Wait 3s for Vercel production alias propagation before purging edge cache
+          sleep 3
+
+          ZONE_ID="$(echo "${CLOUDFLARE_ZONE_ID}" | tr -d '[:space:]"'\''')"
+          API_TOKEN="$(echo "${CLOUDFLARE_API_TOKEN}" | tr -d '[:space:]"'\''')"
+
+          # Fallback: extract from ENV_FILE if not set as separate secret
+          if [ -z "$ZONE_ID" ] && [ -n "$ENV_FILE" ]; then
+            ZONE_ID="$(echo "$ENV_FILE" | grep -E '^\s*CLOUDFLARE_ZONE_ID\s*=' | tail -n 1 | cut -d '=' -f2- | tr -d '[:space:]"'\''')"
+          fi
+          if [ -z "$API_TOKEN" ] && [ -n "$ENV_FILE" ]; then
+            API_TOKEN="$(echo "$ENV_FILE" | grep -E '^\s*CLOUDFLARE_API_TOKEN\s*=' | tail -n 1 | cut -d '=' -f2- | tr -d '[:space:]"'\''')"
+          fi
+
+          if [ -n "$ZONE_ID" ] && [ -n "$API_TOKEN" ]; then
+            echo "Purging Cloudflare edge cache for zone: ${ZONE_ID:0:6}..."
+            RESP=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/purge_cache" \
+              -H "Authorization: Bearer ${API_TOKEN}" \
               -H "Content-Type: application/json" \
-              --data '{"purge_everything":true}'
+              --data '{"purge_everything":true}')
+            echo "Cloudflare response: $RESP"
+            if echo "$RESP" | grep -q '"success":true'; then
+              echo "✅ Cloudflare cache purged successfully!"
+            else
+              echo "⚠️ Cloudflare cache purge returned an error. Check CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN permissions."
+              exit 1
+            fi
           else
             echo "Cloudflare secrets not set, skipping purge."
           fi

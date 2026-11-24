@@ -98,10 +98,10 @@ export async function generateMetadata(): Promise<Metadata> {
         template: `%s`,
       },
       description: settings.metaDescription || brandName || "Your ultimate destination for quality products.",
-      manifest: '/manifest.json',
+      manifest: '/manifest.webmanifest',
       icons: {
-        icon: settings.logoUrl || '/favicon.ico',
-        shortcut: settings.logoUrl || '/favicon.ico',
+        icon: settings.logoUrl || '/logo.webp',
+        shortcut: settings.logoUrl || '/logo.webp',
         apple: settings.logoUrl || '/icon-512x512.png',
       },
       appleWebApp: {
