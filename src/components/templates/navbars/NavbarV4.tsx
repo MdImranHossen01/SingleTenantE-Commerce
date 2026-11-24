@@ -69,6 +69,7 @@ export default function NavbarV4() {
   const { totalQuantity: cartCount, totalAmount } = useAppSelector((state) => state.cart);
   const { items: wishlistItems } = useAppSelector((state) => state.wishlist);
 
+  const settings = useSettings();
   const [categories, setCategories] = useState<any[]>(() =>
     (settings?.categories || []).filter((c: any) => c.isActive !== false)
   );
