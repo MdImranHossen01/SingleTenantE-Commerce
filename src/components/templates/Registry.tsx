@@ -25,15 +25,15 @@ import HeroV4 from './heros/HeroV4';
 import HeroV5 from './heros/HeroV5';
 import HeroAarong from './heros/HeroAarong';
 
-export const HeroSelector = ({ style, banners, layout }: { style: string, banners: any[], layout?: string }) => {
+export const HeroSelector = ({ style, banners, layout, onSlideChange }: { style: string, banners: any[], layout?: string, onSlideChange?: (index: number) => void }) => {
   switch (style) {
-    case 'v1': return <HeroV1 banners={banners} layout={layout} />;
-    case 'v2': return <HeroV2 banners={banners} />;
+    case 'v1': return <HeroV1 banners={banners} layout={layout} onSlideChange={onSlideChange} />;
+    case 'v2': return <HeroV2 banners={banners} onSlideChange={onSlideChange} />;
     case 'v3': return <HeroV3 banners={banners} />;
-    case 'v4': return <HeroV4 banners={banners} />;
+    case 'v4': return <HeroV4 banners={banners} onSlideChange={onSlideChange} />;
     case 'v5': return <HeroV5 banners={banners} />;
-    case 'aarong': return <HeroAarong banners={banners} layout={layout} />;
-    default: return <HeroV1 banners={banners} layout={layout} />;
+    case 'aarong': return <HeroAarong banners={banners} layout={layout} onSlideChange={onSlideChange} />;
+    default: return <HeroV1 banners={banners} layout={layout} onSlideChange={onSlideChange} />;
   }
 };
 

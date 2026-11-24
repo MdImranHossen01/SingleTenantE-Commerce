@@ -118,6 +118,20 @@ export interface IGlobalSettings extends Document {
     image: string;
     rating: number;
   }[];
+  promoBanners?: {
+    left?: {
+      image?: string;
+      link?: string;
+      alt?: string;
+      isActive?: boolean;
+    };
+    right?: {
+      image?: string;
+      link?: string;
+      alt?: string;
+      isActive?: boolean;
+    };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -147,7 +161,7 @@ const GlobalSettingsSchema: Schema<IGlobalSettings> = new Schema(
     tiktokDomainVerification: { type: String },
     tiktokTestEventCode: { type: String },
     courierConfig: { type: Object, default: { activeProvider: 'none' } },
-    subscriptionConfig: { type: Object, default: { activationThreshold: 5000, rewardPercentage: 5 } },
+    subscriptionConfig: { type: Object, default: { activationThreshold: 0, rewardPercentage: 0 } },
     paymentConfig: { type: Object, default: { activeMethod: 'none' } },
     manualPaymentConfig: { type: Object, default: {} },
     googleAnalyticsId: { type: String },
@@ -177,6 +191,23 @@ const GlobalSettingsSchema: Schema<IGlobalSettings> = new Schema(
         rating: { type: Number, default: 5 },
       }
     ],
+    promoBanners: {
+      type: Object,
+      default: {
+        left: {
+          image: '/assets/images/ArongSections/D-Left-Living-Box-Banner1_24-02-2026-SM.webp',
+          link: '/shop?category=home-decor',
+          alt: 'Bronze ballad',
+          isActive: true,
+        },
+        right: {
+          image: '/assets/images/ArongSections/D-Right-Dining-box-banner1-22-07-2025-SM.webp',
+          link: '/shop?category=home-decor',
+          alt: 'Tales in taupe',
+          isActive: true,
+        },
+      },
+    },
   },
   {
     timestamps: true,

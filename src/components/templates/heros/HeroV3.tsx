@@ -82,12 +82,12 @@ export default function HeroV3({ banners, onPlay }: HeroV3Props) {
                )}
 
                <div className="flex gap-4">
-                  <Link href="/shop">
+                  <Link href={banner.primaryBtnLink || banner.link || '/shop'}>
                      <Button className="h-16 px-12 rounded-full bg-white text-black hover:bg-primary hover:text-white font-black text-xs uppercase tracking-[0.3em] transition-all duration-500 shadow-2xl">
                         {banner.primaryBtnText || (t('store.hero.shop_now') as string) || 'Explore Selection'}
                      </Button>
                   </Link>
-                  <Link href="/categories">
+                  <Link href={banner.secondaryBtnLink || '/categories'}>
                      <Button variant="ghost" className="h-16 px-12 rounded-full border border-white/20 text-white hover:bg-white hover:text-black font-black text-xs uppercase tracking-[0.3em] transition-all duration-500">
                         {banner.secondaryBtnText || 'Categories'}
                      </Button>

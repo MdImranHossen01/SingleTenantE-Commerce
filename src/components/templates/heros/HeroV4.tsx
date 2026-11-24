@@ -23,11 +23,12 @@ interface Banner {
 
 interface HeroV4Props {
   banners: Banner[];
+  onSlideChange?: (index: number) => void;
 }
 
 const AUTOPLAY_DELAY = 5000;
 
-export default function HeroV4({ banners }: HeroV4Props) {
+export default function HeroV4({ banners, onSlideChange }: HeroV4Props) {
   const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -39,8 +40,12 @@ export default function HeroV4({ banners }: HeroV4Props) {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setActiveIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+    const idx = emblaApi.selectedScrollSnap();
+    setActiveIndex(idx);
+    if (typeof window === 'undefined' || window.innerWidth >= 1024) {
+      onSlideChange?.(idx);
+    }
+  }, [emblaApi, onSlideChange]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -68,8 +73,12 @@ export default function HeroV4({ banners }: HeroV4Props) {
 
   const onMobileSelect = useCallback(() => {
     if (!mobileEmblaApi) return;
-    setMobileActiveIndex(mobileEmblaApi.selectedScrollSnap());
-  }, [mobileEmblaApi]);
+    const idx = mobileEmblaApi.selectedScrollSnap();
+    setMobileActiveIndex(idx);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onSlideChange?.(idx);
+    }
+  }, [mobileEmblaApi, onSlideChange]);
 
   useEffect(() => {
     if (!mobileEmblaApi) return;

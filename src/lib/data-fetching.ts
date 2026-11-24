@@ -19,6 +19,7 @@ const serialize = (data: any) => JSON.parse(JSON.stringify(data));
 export const CACHE_TAGS = {
   products: 'products',
   categories: 'categories',
+  brands: 'brands',
   banners: 'banners',
   blogs: 'blogs',
   faqs: 'faqs',
@@ -206,6 +207,22 @@ export const getCachedCategories = () => {
   )();
 };
 
+// --- BRANDS ---
+
+export const getCachedBrands = () => {
+  return unstable_cache(
+    async () => {
+      await connectToDatabase();
+      const brands = await Brand.find({ isActive: true })
+        .sort({ name: 1 })
+        .lean();
+      return serialize(brands);
+    },
+    ['brands-list'],
+    { revalidate: 31536000, tags: [CACHE_TAGS.brands] }
+  )();
+};
+
 // --- BANNERS ---
 
 export const getCachedBanners = () => {
@@ -218,7 +235,7 @@ export const getCachedBanners = () => {
       return serialize(banners);
     },
     ['banners-list'],
-    { revalidate: 60, tags: [CACHE_TAGS.banners] }
+    { revalidate: 31536000, tags: [CACHE_TAGS.banners] }
   )();
 };
 
@@ -281,7 +298,7 @@ export const getCachedSettings = () => {
       return serialize(settings);
     },
     ['global-settings'],
-    { tags: [CACHE_TAGS.settings], revalidate: 3600 }
+    { tags: [CACHE_TAGS.settings], revalidate: 31536000 }
   )();
 };
 

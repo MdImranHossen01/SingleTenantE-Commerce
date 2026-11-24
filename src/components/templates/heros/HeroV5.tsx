@@ -66,7 +66,7 @@ export default function HeroV5({ banners }: HeroV5Props) {
 
                   {/* Quick Action Overlay */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-black/10 backdrop-blur-[2px]">
-                     <Link href="/shop">
+                     <Link href={banner?.primaryBtnLink || banner?.link || '/shop'}>
                         <Button className="h-20 px-12 rounded-full bg-white text-black hover:bg-primary hover:text-white font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all duration-500">
                            {banner?.primaryBtnText || (t('store.hero.shop_now') as string) || 'Enter Atelier'}
                         </Button>

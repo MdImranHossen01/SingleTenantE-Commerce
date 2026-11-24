@@ -33,11 +33,12 @@ export async function POST(req: NextRequest) {
     
     // Whitelist allowed fields
     const whitelistedBanner = {
-      title: body.title,
+      title: body.title || '',
+      subtitle: body.subtitle || '',
       image: body.image,
-      link: body.link,
+      link: body.link || body.primaryBtnLink || '/shop',
       primaryBtnText: body.primaryBtnText,
-      primaryBtnLink: body.primaryBtnLink,
+      primaryBtnLink: body.primaryBtnLink || body.link || '/shop',
       secondaryBtnText: body.secondaryBtnText,
       secondaryBtnLink: body.secondaryBtnLink,
       order: body.order ?? 0,
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
     const banner = await Banner.create(whitelistedBanner);
 
     revalidateTag('banners', 'max');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
+    revalidatePath('/', 'page');
     await purgeCloudflareCache().catch(() => {});
 
     return NextResponse.json(banner, { status: 201 });

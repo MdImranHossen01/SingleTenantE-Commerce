@@ -118,8 +118,8 @@ export async function POST(req: NextRequest) {
     // Fetch Settings
     const settings = await GlobalSettings.findOne();
     const subConfig = {
-      activationThreshold: settings?.subscriptionConfig?.activationThreshold ?? 5000,
-      rewardPercentage: settings?.subscriptionConfig?.rewardPercentage ?? 5
+      activationThreshold: settings?.subscriptionConfig?.activationThreshold ?? 0,
+      rewardPercentage: settings?.subscriptionConfig?.rewardPercentage ?? 0
     };
 
     session = await conn.startSession();
@@ -455,9 +455,10 @@ export async function POST(req: NextRequest) {
         walletTxId = walletTx._id.toString();
       }
 
-      // Calculate potential rewards (only if already active or this order hits threshold)
+      // Calculate potential rewards (only if loyalty program is enabled and already active or this order hits threshold)
+      const isLoyaltyEnabled = subConfig.activationThreshold > 0 && subConfig.rewardPercentage > 0;
       const isAlreadyActive = user.isSubscriptionActive;
-      const willBeActive = isAlreadyActive || (totalAfterCoupon >= subConfig.activationThreshold);
+      const willBeActive = isLoyaltyEnabled && (isAlreadyActive || (totalAfterCoupon >= subConfig.activationThreshold));
 
       if (willBeActive) {
         // If not already active, activate it now (atomic update)

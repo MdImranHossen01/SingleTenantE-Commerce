@@ -23,15 +23,33 @@ export async function PUT(
 
     const body = await req.json();
     await connectToDatabase();
-    
-    const banner = await Banner.findOneAndUpdate({ _id: id }, body, { new: true });
+
+    const updateData = {
+      title: body.title ?? '',
+      subtitle: body.subtitle ?? '',
+      image: body.image,
+      link: body.link || body.primaryBtnLink || '/shop',
+      primaryBtnText: body.primaryBtnText,
+      primaryBtnLink: body.primaryBtnLink || body.link || '/shop',
+      secondaryBtnText: body.secondaryBtnText,
+      secondaryBtnLink: body.secondaryBtnLink,
+      order: body.order ?? 0,
+      isActive: body.isActive !== undefined ? body.isActive : true,
+    };
+
+    const banner = await Banner.findOneAndUpdate(
+      { _id: id },
+      { $set: updateData },
+      { new: true }
+    );
     
     if (!banner) {
       return NextResponse.json({ message: 'Banner not found' }, { status: 404 });
     }
 
     revalidateTag('banners', 'max');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
+    revalidatePath('/', 'page');
     await purgeCloudflareCache().catch(() => {});
 
     return NextResponse.json(banner);
@@ -65,7 +83,8 @@ export async function DELETE(
     }
 
     revalidateTag('banners', 'max');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
+    revalidatePath('/', 'page');
     await purgeCloudflareCache().catch(() => {});
 
     return NextResponse.json({ message: 'Banner deleted successfully' });

@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IBanner extends Document {
   title: string;
+  subtitle?: string;
   image: string;
   link?: string;
   primaryBtnText?: string;
@@ -16,7 +17,8 @@ export interface IBanner extends Document {
 
 const BannerSchema: Schema<IBanner> = new Schema(
   {
-    title: { type: String, required: true },
+    title: { type: String, default: '' },
+    subtitle: { type: String, default: '' },
     image: { type: String, required: true },
     link: { type: String },
     primaryBtnText: { type: String },

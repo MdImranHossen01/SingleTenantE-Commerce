@@ -12,7 +12,6 @@ import {
   CategoryShowcaseSkeleton,
   BannerSkeleton,
   BlogRecentSkeleton,
-  FeaturesSectionSkeleton,
 } from '@/components/storefront/Skeletons';
 import Link from 'next/link';
 
@@ -85,10 +84,6 @@ const ProductCarouselSection = dynamic(() => import('@/components/storefront/Pro
 
 const BlogRecent = dynamic(() => import('@/components/storefront/BlogRecent').then(mod => mod.BlogRecent), {
   loading: () => <BlogRecentSkeleton />
-});
-
-const FeaturesSection = dynamic(() => import('@/components/storefront/FeaturesSection').then(mod => mod.FeaturesSection), {
-  loading: () => <FeaturesSectionSkeleton />
 });
 
 const LoyaltyBanner = dynamic(() => import('@/components/storefront/LoyaltyBanner').then(mod => mod.LoyaltyBanner), {
@@ -237,7 +232,7 @@ export default async function Home() {
             )}
 
             {/* Aarong Promotional Banners Section */}
-            <AarongPromoBanners />
+            <AarongPromoBanners settings={data.settings} />
 
             {/* 8. Featured Collections */}
             {data.featuredProducts.length > 0 && (
@@ -287,9 +282,6 @@ export default async function Home() {
             {/* 9. Recent Blogs section */}
             <BlogRecent blogs={data.blogs} />
 
-            {/* 2. Our Features (Trust Badges) */}
-            {ui.layout !== 'aarong' && <FeaturesSection />}
-
             {/* 11. Newsletter V2 Integration */}
             <NewsletterV2 layout={ui.layout} />
           </div>
@@ -316,7 +308,7 @@ export default async function Home() {
           )}
 
           {/* Aarong Promotional Banners Section */}
-          <AarongPromoBanners />
+          <AarongPromoBanners settings={data.settings} />
 
           {/* 8. Featured Collections */}
           {data.featuredProducts.length > 0 && (
@@ -365,9 +357,6 @@ export default async function Home() {
 
           {/* 9. Recent Blogs section */}
           <BlogRecent blogs={data.blogs} />
-
-          {/* 2. Our Features (Trust Badges) */}
-          {ui.layout !== 'aarong' && <FeaturesSection />}
 
           {/* 11. Newsletter V2 Integration */}
           <NewsletterV2 layout={ui.layout} />

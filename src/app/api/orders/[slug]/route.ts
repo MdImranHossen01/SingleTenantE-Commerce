@@ -205,11 +205,12 @@ export async function PATCH(
         const user = await User.findOne({ _id: order.user }).session(dbSession);
         const settings = await GlobalSettings.findOne().session(dbSession);
         const subConfig = {
-          activationThreshold: settings?.subscriptionConfig?.activationThreshold ?? 5000,
-          rewardPercentage: settings?.subscriptionConfig?.rewardPercentage ?? 5
+          activationThreshold: settings?.subscriptionConfig?.activationThreshold ?? 0,
+          rewardPercentage: settings?.subscriptionConfig?.rewardPercentage ?? 0
         };
+        const isLoyaltyEnabled = subConfig.activationThreshold > 0 && subConfig.rewardPercentage > 0;
 
-        if (user) {
+        if (user && isLoyaltyEnabled) {
           if (!user.isSubscriptionActive && order.totalAmount >= subConfig.activationThreshold) {
             user.isSubscriptionActive = true;
             await user.save({ session: dbSession });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -31,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Pagination } from '@/components/ui/pagination';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-interface ShopCategory {
+export interface ShopCategory {
   _id: string;
   slug: string;
   name: string;
@@ -39,7 +40,15 @@ interface ShopCategory {
   isActive: boolean;
 }
 
-interface ShopProduct {
+export interface ShopBrand {
+  _id: string;
+  slug?: string;
+  name: string;
+  image?: string;
+  isActive: boolean;
+}
+
+export interface ShopProduct {
   _id: string;
   name: string;
   slug: string;
@@ -58,16 +67,24 @@ interface ShopProduct {
   images: string[];
   stock: number;
   categories?: any[];
+  brand?: any;
 }
 
 interface ShopClientProps {
   initialProducts: ShopProduct[];
   initialCategories: ShopCategory[];
+  initialBrands?: ShopBrand[];
   searchParams?: any;
   cardStyle?: string;
 }
 
-export default function ShopClient({ initialProducts, initialCategories, searchParams: initialSearchParams, cardStyle }: ShopClientProps) {
+export default function ShopClient({
+  initialProducts,
+  initialCategories,
+  initialBrands = [],
+  searchParams: _initialSearchParams,
+  cardStyle,
+}: ShopClientProps) {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -75,12 +92,49 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
   const [products] = useState<ShopProduct[]>(initialProducts);
   const [categories] = useState<ShopCategory[]>(initialCategories);
 
+  // Merge initialBrands with any populated brands on products
+  const [brands] = useState<ShopBrand[]>(() => {
+    const map = new Map<string, ShopBrand>();
+    (initialBrands || []).forEach((b) => {
+      if (b && b._id && b.isActive !== false) {
+        map.set(String(b._id), b);
+      }
+    });
+    (initialProducts || []).forEach((p) => {
+      if (p?.brand && typeof p.brand === 'object' && p.brand._id && p.brand.name) {
+        const id = String(p.brand._id);
+        if (!map.has(id) && p.brand.isActive !== false) {
+          map.set(id, {
+            _id: id,
+            name: p.brand.name,
+            slug: p.brand.slug,
+            image: p.brand.image,
+            isActive: true,
+          });
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   // Filters State
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
     const initialCategory = searchParams.get('category');
     if (!initialCategory) return [];
     const cat = initialCategories.find(c => c.slug === initialCategory || c._id === initialCategory);
     return [cat ? cat.slug : initialCategory];
+  });
+
+  const [selectedBrands, setSelectedBrands] = useState<string[]>(() => {
+    const initialBrand = searchParams.get('brand');
+    if (!initialBrand) return [];
+    const b = initialBrands.find(
+      item =>
+        item.slug === initialBrand ||
+        item._id === initialBrand ||
+        item.name.toLowerCase() === initialBrand.toLowerCase()
+    );
+    return [b ? (b.slug || b._id) : initialBrand];
   });
 
   const getParentId = useCallback((cat: any) => {
@@ -114,7 +168,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     if (cat) {
       toExpand.push(cat._id);
       const visited = new Set<string>([cat._id]);
-      let parent = cat.parentCategory;
+      const parent = cat.parentCategory;
       let parentId = parent ? (typeof parent === 'object' ? parent._id : parent) : null;
       while (parentId && !visited.has(parentId)) {
         visited.add(parentId);
@@ -153,7 +207,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     return categories.filter(c => getParentId(c) === parentId);
   }, [categories, getParentId]);
 
-  // Track previous search params to sync state during render (avoids cascading renders)
+  // Track previous search params to sync state during render
   const [prevSearchParamsStr, setPrevSearchParamsStr] = useState(searchParams.toString());
   if (searchParams.toString() !== prevSearchParamsStr) {
     setPrevSearchParamsStr(searchParams.toString());
@@ -185,6 +239,14 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
         }
       }
     }
+    const urlBrand = searchParams.get('brand');
+    const resolvedBrandSlug = urlBrand
+      ? (brands.find(b => b.slug === urlBrand || b._id === urlBrand || b.name.toLowerCase() === urlBrand.toLowerCase())?.slug || urlBrand)
+      : null;
+    const newBrandSelected = resolvedBrandSlug ? [resolvedBrandSlug] : [];
+    if (JSON.stringify(newBrandSelected) !== JSON.stringify(selectedBrands)) {
+      setSelectedBrands(newBrandSelected);
+    }
     const urlPage = Number(searchParams.get('page')) || 1;
     if (urlPage !== currentPage) {
       setCurrentPage(urlPage);
@@ -194,6 +256,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
   // Track filters to reset page on render if they change
   const currentFiltersStr = JSON.stringify({
     selectedCategories,
+    selectedBrands,
     minPrice,
     maxPrice,
     sortBy,
@@ -248,6 +311,17 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
         (p.description?.toLowerCase() ?? '').includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategories.length === 0 ||
         (p.categories ?? []).some((c) => expandedMatchingSlugs.has(c.slug || '') || expandedMatchingSlugs.has(c._id || ''));
+
+      const productBrandId = p.brand?._id ? String(p.brand._id) : (typeof p.brand === 'string' ? p.brand : '');
+      const productBrandSlug = p.brand?.slug ? String(p.brand.slug) : '';
+      const productBrandName = p.brand?.name ? String(p.brand.name).toLowerCase() : '';
+
+      const matchesBrand = selectedBrands.length === 0 || selectedBrands.some(b =>
+        b === productBrandId ||
+        b === productBrandSlug ||
+        b.toLowerCase() === productBrandName
+      );
+
       const price = p.salePrice ?? p.price;
       const min = minPrice !== '' ? Number(minPrice) : 0;
       const max = maxPrice !== '' ? Number(maxPrice) : Infinity;
@@ -263,7 +337,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
       const matchesFeatured = (!showOnlyFeatured && sortBy !== 'featured') || isFeatured;
       const matchesTrending = (!showOnlyTrending && sortBy !== 'trending') || isTrending;
 
-      return matchesSearch && matchesCategory && matchesPrice && matchesNewArrival && matchesSale && matchesFeatured && matchesTrending;
+      return matchesSearch && matchesCategory && matchesBrand && matchesPrice && matchesNewArrival && matchesSale && matchesFeatured && matchesTrending;
     })
     .sort((a, b) => {
       const priceA = a.salePrice ?? a.price;
@@ -278,7 +352,6 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
-  // Clamp page to valid range during render (avoids cascading renders in useEffect)
   if (products.length > 0) {
     const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
     if (safePage !== currentPage) {
@@ -286,7 +359,6 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     }
   }
 
-  // Sync URL when currentPage changes and does not match the URL parameter
   useEffect(() => {
     const urlPage = Number(searchParams.get('page')) || 1;
     if (urlPage !== currentPage) {
@@ -305,6 +377,24 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     currentPage * itemsPerPage
   );
 
+  const toggleBrand = (brandOrSlug: ShopBrand | string) => {
+    const brandObj = typeof brandOrSlug === 'string'
+      ? brands.find(b => b.slug === brandOrSlug || b._id === brandOrSlug || b.name.toLowerCase() === brandOrSlug.toLowerCase())
+      : brandOrSlug;
+    const normalizedKey = brandObj ? (brandObj.slug || brandObj._id) : (typeof brandOrSlug === 'string' ? brandOrSlug : brandOrSlug._id);
+
+    const isSelected = selectedBrands.includes(normalizedKey) ||
+      (brandObj ? (selectedBrands.includes(brandObj._id) || (Boolean(brandObj.slug) && selectedBrands.includes(brandObj.slug!))) : false);
+
+    if (isSelected) {
+      setSelectedBrands(prev => prev.filter(s =>
+        s !== normalizedKey && (!brandObj || (s !== brandObj._id && s !== brandObj.slug))
+      ));
+    } else {
+      setSelectedBrands(prev => [...prev, normalizedKey]);
+    }
+  };
+
   const toggleCategory = (catOrSlug: ShopCategory | string) => {
     const catObj = typeof catOrSlug === 'string'
       ? categories.find(c => c.slug === catOrSlug || c._id === catOrSlug)
@@ -320,7 +410,6 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
       ));
     } else {
       setSelectedCategories(prev => [...prev, normalizedSlug]);
-      // Auto-expand category and its parent chain when checked
       if (catObj) {
         const toExpand = getAncestorsAndSelf(catObj.slug, categories);
         if (toExpand.length > 0) {
@@ -339,6 +428,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
 
   const clearFilters = () => {
     setSelectedCategories([]);
+    setSelectedBrands([]);
     setMinPrice('');
     setMaxPrice('');
     setSearchTerm('');
@@ -350,9 +440,10 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
   };
 
   const renderSidebar = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Categories Filter */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold uppercase tracking-wider">{t('store.shop.categories') || 'Categories'}</h3>
           {selectedCategories.length > 0 && (
             <button
@@ -365,7 +456,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
         </div>
 
         {/* Scrollable Category Tree */}
-        <div className="max-h-[360px] overflow-y-auto space-y-1.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="max-h-[200px] overflow-y-auto space-y-1 pr-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/40 overscroll-contain">
           {mainCategories.map((mainCat) => {
             const subs = getSubcategories(mainCat._id);
             const hasSubs = subs.length > 0;
@@ -477,14 +568,133 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
         </div>
       </div>
 
+      {/* Brands Filter */}
+      {brands.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider">Brands</h3>
+            {selectedBrands.length > 0 && (
+              <button
+                onClick={() => setSelectedBrands([])}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                {t('store.shop.clear') || 'Clear'}
+              </button>
+            )}
+          </div>
+
+          {/* Scrollable Brands List */}
+          <div className="max-h-[130px] overflow-y-auto space-y-1 pr-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/40 overscroll-contain">
+            {brands.map((b) => {
+              const isBrandSelected = selectedBrands.includes(b.slug || '') || selectedBrands.includes(b._id) || selectedBrands.includes(b.name.toLowerCase());
+              return (
+                <div key={b._id} className="flex items-center space-x-2.5 p-1.5 hover:bg-muted/40 rounded-md transition-colors">
+                  <Checkbox
+                    id={`brand-${b._id}`}
+                    checked={isBrandSelected}
+                    onCheckedChange={() => toggleBrand(b)}
+                  />
+                  <Label
+                    htmlFor={`brand-${b._id}`}
+                    className="text-sm font-semibold leading-none cursor-pointer hover:text-primary transition-colors truncate flex-1"
+                  >
+                    {b.name}
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Filters */}
       <div>
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4">{t('store.shop.price_range') || 'Price Range'}</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider mb-2">Quick Filters</h3>
+        <div className="space-y-1.5">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="show-all"
+              checked={!showOnlyNew && !showOnlySale && !showOnlyFeatured && !showOnlyTrending && sortBy === 'all'}
+              onCheckedChange={() => {
+                setShowOnlyNew(false);
+                setShowOnlySale(false);
+                setShowOnlyFeatured(false);
+                setShowOnlyTrending(false);
+                setSortBy('all');
+              }}
+            />
+            <Label htmlFor="show-all" className="text-sm font-medium leading-none cursor-pointer">
+              {t('store.shop.sort_by.all') || 'All Products'}
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="new-arrivals"
+              checked={showOnlyNew || sortBy === 'new'}
+              onCheckedChange={(checked) => {
+                setShowOnlyNew(!!checked);
+                if (checked && sortBy === 'all') setSortBy('new');
+                if (!checked && sortBy === 'new') setSortBy('all');
+              }}
+            />
+            <Label htmlFor="new-arrivals" className="text-sm font-medium leading-none cursor-pointer">
+              {t('store.shop.sort_by.new') || 'New Arrivals'}
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="trending-now"
+              checked={showOnlyTrending || sortBy === 'trending'}
+              onCheckedChange={(checked) => {
+                setShowOnlyTrending(!!checked);
+                if (checked && sortBy === 'all') setSortBy('trending');
+                if (!checked && sortBy === 'trending') setSortBy('all');
+              }}
+            />
+            <Label htmlFor="trending-now" className="text-sm font-medium leading-none cursor-pointer">
+              Trending Now
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="on-sale"
+              checked={showOnlySale || sortBy === 'sale'}
+              onCheckedChange={(checked) => {
+                setShowOnlySale(!!checked);
+                if (checked && sortBy === 'all') setSortBy('sale');
+                if (!checked && sortBy === 'sale') setSortBy('all');
+              }}
+            />
+            <Label htmlFor="on-sale" className="text-sm font-medium leading-none cursor-pointer">
+              On Sale / Flash Sale
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="featured"
+              checked={showOnlyFeatured || sortBy === 'featured'}
+              onCheckedChange={(checked) => {
+                setShowOnlyFeatured(!!checked);
+                if (checked && sortBy === 'all') setSortBy('featured');
+                if (!checked && sortBy === 'featured') setSortBy('all');
+              }}
+            />
+            <Label htmlFor="featured" className="text-sm font-medium leading-none cursor-pointer">
+              Featured Collections
+            </Label>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Range */}
+      <div>
+        <h3 className="text-sm font-bold uppercase tracking-wider mb-2">{t('store.shop.price_range') || 'Price Range'}</h3>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <span className="absolute left-2.5 top-2.5 text-xs text-muted-foreground">৳</span>
             <Input
               type="number"
-              placeholder={t('store.shop.min') as string || 'Min'}
+              placeholder={(t('store.shop.min') as string) || 'Min'}
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
               className="pl-6 text-sm"
@@ -495,7 +705,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
             <span className="absolute left-2.5 top-2.5 text-xs text-muted-foreground">৳</span>
             <Input
               type="number"
-              placeholder={t('store.shop.max') as string || 'Max'}
+              placeholder={(t('store.shop.max') as string) || 'Max'}
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
               className="pl-6 text-sm"
@@ -514,7 +724,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     <div className="container mx-auto px-4 md:px-0 py-10">
       <div className="flex flex-col gap-8 md:flex-row">
         {/* Desktop Sidebar */}
-        <aside className="hidden w-64 shrink-0 md:block sticky top-20 self-start h-fit max-h-[calc(100vh-6rem)] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <aside className="hidden w-64 shrink-0 md:block sticky top-20 self-start h-fit max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted-foreground/15 hover:scrollbar-thumb-muted-foreground/30 overscroll-contain">
           {renderSidebar()}
         </aside>
 
@@ -538,7 +748,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
                     <Filter className="h-4 w-4" /> {t('store.shop.filters') || 'Filters'}
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-6 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <SheetContent side="left" className="p-6 overflow-y-auto">
                   <SheetHeader className="mb-6 p-0">
                     <SheetTitle>{t('store.shop.filters') || 'Filter Products'}</SheetTitle>
                   </SheetHeader>
@@ -550,7 +760,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
                 if (val) setSortBy(val);
               }}>
                 <SelectTrigger className="w-full sm:w-[190px]">
-                  <SelectValue placeholder={t('store.shop.sort_by.all') as string || 'All Products'} />
+                  <SelectValue placeholder={(t('store.shop.sort_by.all') as string) || 'All Products'} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('store.shop.sort_by.all') || 'All Products'}</SelectItem>
@@ -572,7 +782,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
           </div>
 
           {/* Active Filters Bar */}
-          {(selectedCategories.length > 0 || searchTerm || minPrice !== '' || maxPrice !== '' || sortBy !== 'all' || showOnlyNew || showOnlySale || showOnlyFeatured || showOnlyTrending) && (
+          {(selectedCategories.length > 0 || selectedBrands.length > 0 || searchTerm || minPrice !== '' || maxPrice !== '' || sortBy !== 'all' || showOnlyNew || showOnlySale || showOnlyFeatured || showOnlyTrending) && (
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-xs font-bold uppercase text-muted-foreground mr-2">{t('store.shop.filtered_by') || 'Filtered By:'}</span>
               {selectedCategories.map(cat => {
@@ -594,6 +804,25 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
                   </Badge>
                 );
               })}
+              {selectedBrands.map(b => {
+                const brandName = brands.find(item => item.slug === b || item._id === b || item.name.toLowerCase() === b.toLowerCase())?.name || b;
+                return (
+                  <Badge key={b} variant="secondary" className="gap-1 rounded-full pl-3 pr-1 py-1 flex items-center border-primary/30">
+                    <span className="font-semibold text-primary">Brand: {brandName}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleBrand(b);
+                      }}
+                      className="p-0.5 rounded-full hover:bg-muted-foreground/20 hover:text-foreground cursor-pointer transition-colors"
+                      aria-label={`Remove ${brandName} brand filter`}
+                    >
+                      <X className="h-3 w-3 pointer-events-auto" />
+                    </button>
+                  </Badge>
+                );
+              })}
               {searchTerm && (
                 <Badge variant="secondary" className="gap-1 rounded-full pl-3 pr-1 py-1 flex items-center">
                   <span>{t('store.shop.search')}: {searchTerm}</span>
@@ -604,7 +833,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
                       setSearchTerm('');
                     }}
                     className="p-0.5 rounded-full hover:bg-muted-foreground/20 hover:text-foreground cursor-pointer transition-colors"
-                    aria-label="Clear search"
+                    aria-label="Remove search filter"
                   >
                     <X className="h-3 w-3 pointer-events-auto" />
                   </button>
@@ -612,7 +841,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
               )}
               {(minPrice !== '' || maxPrice !== '') && (
                 <Badge variant="secondary" className="gap-1 rounded-full pl-3 pr-1 py-1 flex items-center">
-                  <span>{t('store.shop.price')}: ৳{minPrice || '0'} - ৳{maxPrice || '∞'}</span>
+                  <span>{t('store.shop.price_range')}: ৳{minPrice || 0} - ৳{maxPrice || '∞'}</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -621,7 +850,7 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
                       setMaxPrice('');
                     }}
                     className="p-0.5 rounded-full hover:bg-muted-foreground/20 hover:text-foreground cursor-pointer transition-colors"
-                    aria-label="Clear price filter"
+                    aria-label="Remove price filter"
                   >
                     <X className="h-3 w-3 pointer-events-auto" />
                   </button>
@@ -770,4 +999,3 @@ export default function ShopClient({ initialProducts, initialCategories, searchP
     </div>
   );
 }
-

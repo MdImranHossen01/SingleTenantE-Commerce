@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
     });
 
     revalidateTag('brands', 'max');
-    revalidatePath('/');
+    revalidateTag('products', 'max');
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop', 'page');
 
     await purgeCloudflareCache().catch(() => {});
     return NextResponse.json(newBrand, { status: 201 });

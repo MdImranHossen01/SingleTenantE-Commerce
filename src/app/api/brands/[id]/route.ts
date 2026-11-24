@@ -82,7 +82,9 @@ export async function PUT(
     }
 
     revalidateTag('brands', 'max');
-    revalidatePath('/');
+    revalidateTag('products', 'max');
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop', 'page');
 
     await purgeCloudflareCache().catch(() => {});
     return NextResponse.json(updatedBrand);
@@ -126,7 +128,9 @@ export async function DELETE(
     await Brand.deleteOne({ _id: brand._id });
 
     revalidateTag('brands', 'max');
-    revalidatePath('/');
+    revalidateTag('products', 'max');
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop', 'page');
 
     await purgeCloudflareCache().catch(() => {});
     return NextResponse.json({ message: 'Brand deleted successfully' });

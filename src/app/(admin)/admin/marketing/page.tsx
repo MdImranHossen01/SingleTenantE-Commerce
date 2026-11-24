@@ -33,11 +33,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 const marketingSettingsSchema = z.object({
   subscriptionConfig: z.object({
-    activationThreshold: z.number().min(0, 'Threshold cannot be negative'),
-    rewardPercentage: z.number().min(0, 'Percentage cannot be negative').max(100, 'Cannot exceed 100%'),
+    activationThreshold: z.coerce.number().min(0, 'Threshold cannot be negative'),
+    rewardPercentage: z.coerce.number().min(0, 'Percentage cannot be negative').max(100, 'Cannot exceed 100%'),
   }).optional(),
-  deliveryChargeInsideDhaka: z.number().min(0, 'Charge cannot be negative').optional(),
-  deliveryChargeOutsideDhaka: z.number().min(0, 'Charge cannot be negative').optional(),
+  deliveryChargeInsideDhaka: z.coerce.number().min(0, 'Charge cannot be negative').optional(),
+  deliveryChargeOutsideDhaka: z.coerce.number().min(0, 'Charge cannot be negative').optional(),
   paymentConfig: z.object({
     activeMethod: z.string().default('none'),
     sslcommerz: z.object({
@@ -154,8 +154,8 @@ export default function MarketingSettingsPage() {
     resolver: zodResolver(marketingSettingsSchema) as any,
     defaultValues: {
       subscriptionConfig: {
-        activationThreshold: 5000,
-        rewardPercentage: 5,
+        activationThreshold: 0,
+        rewardPercentage: 0,
       },
       deliveryChargeInsideDhaka: 60,
       deliveryChargeOutsideDhaka: 120,
@@ -208,8 +208,8 @@ export default function MarketingSettingsPage() {
             if (!controller.signal.aborted) {
               const sanitizedData: MarketingSettingsFormValues = {
                 subscriptionConfig: {
-                  activationThreshold: result.data.subscriptionConfig?.activationThreshold ?? 5000,
-                  rewardPercentage: result.data.subscriptionConfig?.rewardPercentage ?? 5,
+                  activationThreshold: result.data.subscriptionConfig?.activationThreshold ?? 0,
+                  rewardPercentage: result.data.subscriptionConfig?.rewardPercentage ?? 0,
                 },
                 deliveryChargeInsideDhaka: result.data.deliveryChargeInsideDhaka ?? 60,
                 deliveryChargeOutsideDhaka: result.data.deliveryChargeOutsideDhaka ?? 120,

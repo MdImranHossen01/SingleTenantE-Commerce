@@ -332,11 +332,6 @@ const data = {
       icon: ImageIcon,
       items: [
         {
-          title: "Banners",
-          tKey: "sidebar.banners",
-          url: "/admin/cms/banners",
-        },
-        {
           title: "Landing Pages",
           tKey: "sidebar.landing_pages",
           url: "/admin/landing-pages",

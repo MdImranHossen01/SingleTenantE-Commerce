@@ -24,11 +24,12 @@ interface Banner {
 interface HeroSliderProps {
   banners: Banner[];
   layout?: string;
+  onSlideChange?: (index: number) => void;
 }
 
 const AUTOPLAY_DELAY = 5000;
 
-export default function HeroAarong({ banners, layout }: HeroSliderProps) {
+export default function HeroAarong({ banners, layout, onSlideChange }: HeroSliderProps) {
   const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
   const slides = banners && banners.length > 0 ? banners : null;
@@ -44,8 +45,10 @@ export default function HeroAarong({ banners, layout }: HeroSliderProps) {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setActiveIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+    const idx = emblaApi.selectedScrollSnap();
+    setActiveIndex(idx);
+    onSlideChange?.(idx);
+  }, [emblaApi, onSlideChange]);
 
   useEffect(() => {
     if (!emblaApi) return;

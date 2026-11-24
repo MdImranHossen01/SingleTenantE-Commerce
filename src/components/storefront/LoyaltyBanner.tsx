@@ -11,10 +11,10 @@ interface LoyaltyBannerProps {
 }
 
 export function LoyaltyBanner({ settings, layout }: LoyaltyBannerProps) {
-  const threshold = settings?.subscriptionConfig?.activationThreshold ?? 5000;
-  const percentage = settings?.subscriptionConfig?.rewardPercentage ?? 5;
+  const threshold = settings?.subscriptionConfig?.activationThreshold ?? 0;
+  const percentage = settings?.subscriptionConfig?.rewardPercentage ?? 0;
 
-  if (percentage <= 0) {
+  if (threshold <= 0 || percentage <= 0) {
     return null;
   }
 

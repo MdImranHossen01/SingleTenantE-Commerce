@@ -24,11 +24,12 @@ interface Banner {
 
 interface HeroSliderProps {
   banners: Banner[];
+  onSlideChange?: (index: number) => void;
 }
 
 const AUTOPLAY_DELAY = 6000;
 
-export default function HeroV2({ banners }: HeroSliderProps) {
+export default function HeroV2({ banners, onSlideChange }: HeroSliderProps) {
   const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
   const slides = banners && banners.length > 0 ? banners : [];
@@ -44,8 +45,10 @@ export default function HeroV2({ banners }: HeroSliderProps) {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setActiveIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+    const idx = emblaApi.selectedScrollSnap();
+    setActiveIndex(idx);
+    onSlideChange?.(idx);
+  }, [emblaApi, onSlideChange]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -67,7 +70,24 @@ export default function HeroV2({ banners }: HeroSliderProps) {
   const scrollTo = (index: number) => emblaApi?.scrollTo(index);
   const scrollNext = () => emblaApi?.scrollNext();
 
-  if (slides.length === 0) return null;
+  if (slides.length === 0) {
+    return (
+      <section className="relative w-full aspect-video md:aspect-auto md:h-[600px] lg:h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 font-jost">
+        <div className="text-center px-6 max-w-2xl relative z-10">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white mb-4 uppercase tracking-tight">
+            Quality Products, Unbeatable Prices
+          </h1>
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-full hover:bg-white hover:text-black transition-all text-xs sm:text-sm uppercase tracking-widest shadow-2xl"
+          >
+            {(t('store.hero.shop_now') as string) || 'Shop Now'}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative w-full aspect-video md:aspect-auto md:h-[600px] lg:h-screen overflow-hidden bg-transparent font-jost">

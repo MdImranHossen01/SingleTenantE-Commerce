@@ -5,6 +5,13 @@ import React, { createContext, useContext } from 'react';
 interface SettingsContextType {
   brandName?: string;
   logoUrl?: string;
+  freeDeliveryThreshold?: number;
+  deliveryChargeInsideDhaka?: number;
+  deliveryChargeOutsideDhaka?: number;
+  subscriptionConfig?: {
+    activationThreshold?: number;
+    rewardPercentage?: number;
+  };
   socialLinks?: {
     facebook?: string;
     twitter?: string;
@@ -33,6 +40,20 @@ interface SettingsContextType {
     image: string;
     rating: number;
   }[];
+  promoBanners?: {
+    left?: {
+      image?: string;
+      link?: string;
+      alt?: string;
+      isActive?: boolean;
+    };
+    right?: {
+      image?: string;
+      link?: string;
+      alt?: string;
+      isActive?: boolean;
+    };
+  };
   contact?: {
     email?: string;
     phone?: string;

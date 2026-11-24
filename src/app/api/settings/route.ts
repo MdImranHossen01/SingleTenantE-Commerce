@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !(['admin', 'super_admin'].includes((session.user as any)?.role))) {
+    if (!session || !session.user || !(['admin', 'super_admin', 'manager'].includes((session.user as any)?.role))) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
       'logoUrl',
       'footerNavigation',
       'testimonials',
+      'promoBanners',
       'paymentConfig',
       'manualPaymentConfig',
       'courierConfig',
@@ -211,10 +212,12 @@ export async function POST(req: NextRequest) {
     }
 
     revalidateTag('settings', 'max');
+    revalidateTag('banners', 'max');
     revalidateTag('products', 'max');
     revalidateTag('categories', 'max');
     revalidateTag('faqs', 'max');
     revalidatePath('/', 'layout');
+    revalidatePath('/', 'page');
     revalidatePath('/shop', 'page');
     revalidatePath('/blog', 'page');
     await purgeCloudflareCache().catch(() => {});

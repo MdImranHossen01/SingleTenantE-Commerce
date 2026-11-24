@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
   Form,
   FormControl,
@@ -81,12 +82,12 @@ const settingsSchema = z.object({
   metaTitle: z.string().nullish().transform(val => val ?? ''),
   metaDescription: z.string().nullish().transform(val => val ?? ''),
   subscriptionConfig: z.object({
-    activationThreshold: z.number().min(0, 'Threshold cannot be negative'),
-    rewardPercentage: z.number().min(0, 'Percentage cannot be negative').max(100, 'Cannot exceed 100%'),
+    activationThreshold: z.coerce.number().min(0, 'Threshold cannot be negative'),
+    rewardPercentage: z.coerce.number().min(0, 'Percentage cannot be negative').max(100, 'Cannot exceed 100%'),
   }).optional(),
-  freeDeliveryThreshold: z.number().min(0, 'Threshold cannot be negative').optional(),
-  deliveryChargeInsideDhaka: z.number().min(0, 'Charge cannot be negative').optional(),
-  deliveryChargeOutsideDhaka: z.number().min(0, 'Charge cannot be negative').optional(),
+  freeDeliveryThreshold: z.coerce.number().min(0, 'Threshold cannot be negative').optional(),
+  deliveryChargeInsideDhaka: z.coerce.number().min(0, 'Charge cannot be negative').optional(),
+  deliveryChargeOutsideDhaka: z.coerce.number().min(0, 'Charge cannot be negative').optional(),
   logoUrl: z.string().nullish().transform(val => val ?? ''),
   uiTemplates: z.object({
     theme: z.string().default('green'),
@@ -189,8 +190,8 @@ export default function SettingsPage() {
       metaTitle: '',
       metaDescription: '',
       subscriptionConfig: {
-        activationThreshold: 5000,
-        rewardPercentage: 5,
+        activationThreshold: 0,
+        rewardPercentage: 0,
       },
       freeDeliveryThreshold: 0,
       deliveryChargeInsideDhaka: 60,
@@ -270,8 +271,8 @@ export default function SettingsPage() {
                 deliveryChargeInsideDhaka: result.data.deliveryChargeInsideDhaka ?? 60,
                 deliveryChargeOutsideDhaka: result.data.deliveryChargeOutsideDhaka ?? 120,
                 subscriptionConfig: {
-                  activationThreshold: result.data.subscriptionConfig?.activationThreshold ?? 5000,
-                  rewardPercentage: result.data.subscriptionConfig?.rewardPercentage ?? 5,
+                  activationThreshold: result.data.subscriptionConfig?.activationThreshold ?? 0,
+                  rewardPercentage: result.data.subscriptionConfig?.rewardPercentage ?? 0,
                 },
                 logoUrl: result.data.logoUrl || '',
                 uiTemplates: {
@@ -478,6 +479,91 @@ export default function SettingsPage() {
                       )}
                     />
                   )}
+
+                  {/* Delivery Charges & Free Delivery Threshold */}
+                  <div className="border-t border-border pt-5 mt-2 space-y-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-bold flex items-center gap-2 text-foreground">
+                        <Truck className="h-4 w-4 text-primary" /> Delivery Charges & Free Delivery Threshold
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Configure standard delivery charges and minimum order amount for automatic free delivery across the store. Set 0 to disable free delivery.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="deliveryChargeInsideDhaka"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-foreground">Inside Dhaka Delivery (৳)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="60"
+                                {...field}
+                                value={field.value ?? 60}
+                                onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                className="h-11 rounded-xl bg-muted/40 border-2 border-border focus:border-primary font-semibold"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="deliveryChargeOutsideDhaka"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-foreground">Outside Dhaka Delivery (৳)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="120"
+                                {...field}
+                                value={field.value ?? 120}
+                                onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                className="h-11 rounded-xl bg-muted/40 border-2 border-border focus:border-primary font-semibold"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="freeDeliveryThreshold"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-primary flex items-center gap-1.5">
+                              Free Delivery Threshold (৳)
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="0 (0 = Disabled)"
+                                {...field}
+                                value={field.value ?? 0}
+                                onChange={e => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                                className="h-11 rounded-xl bg-primary/5 border-2 border-primary/30 focus:border-primary font-bold text-primary"
+                              />
+                            </FormControl>
+                            <FormDescription className="text-[11px] text-primary/80">
+                              Order value ≥ this amount triggers FREE shipping.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
