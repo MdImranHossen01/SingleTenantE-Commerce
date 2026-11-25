@@ -32,6 +32,8 @@ const sanitizeForScript = (json: any) => {
   return JSON.stringify(json).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 };
 
+export const revalidate = 31536000;
+
 export async function generateMetadata(): Promise<Metadata> {
   const [settings, banners] = await Promise.all([
     getCachedSettings(),
