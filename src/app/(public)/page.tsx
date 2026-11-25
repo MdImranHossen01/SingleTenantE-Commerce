@@ -15,7 +15,6 @@ import {
 } from '@/components/storefront/Skeletons';
 import Link from 'next/link';
 
-import { headers } from 'next/headers';
 import {
   getCachedBanners,
   getCachedCategories,
@@ -44,10 +43,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const description = settings?.metaDescription || settings?.siteDescription || 'Your ultimate destination for quality products.';
   const ogImage = banners?.[0]?.image || settings?.logoUrl || '';
 
-  const headersList = await headers();
-  const hostname = headersList.get('host') || 'localhost';
-  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  const baseUrl = `${protocol}://${hostname}`;
+  const rawSiteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : 'http://localhost:3000');
+  const baseUrl = rawSiteUrl.startsWith('http') ? rawSiteUrl : `https://${rawSiteUrl}`;
 
   return {
     title: {
