@@ -15,7 +15,6 @@ import {
   Globe,
   CreditCard,
   BarChart3,
-  Truck,
   Settings2,
   Code,
   X,
@@ -388,59 +387,6 @@ export default function SuperConfigPage() {
                <div className="space-y-2">
                 <Label htmlFor="gemini-api-key" className="font-bold text-xs">Gemini API Key</Label>
                 <input id="gemini-api-key" type="text" value={settings?.aiConfig?.geminiApiKey || ''} onChange={(e) => setSettings({...settings, aiConfig: {...(settings?.aiConfig || {}), geminiApiKey: e.target.value}})} className="w-full h-12 rounded-xl border px-4 text-sm" />
-              </div>
-           </CardContent>
-        </Card>
-
-         {/* 4. Courier Logistics */}
-        <Card className="lg:col-span-3 border-2 border-orange-500/20 shadow-none overflow-hidden rounded-3xl">
-           <CardHeader className="bg-orange-500/5 border-b">
-              <CardTitle className="flex items-center gap-2">
-                 <Truck className="h-5 w-5 text-orange-600" /> Courier & Shipping Rules
-              </CardTitle>
-           </CardHeader>
-           <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-1 space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold">Active Provider</Label>
-                    <Select value={settings?.courierConfig?.activeProvider || 'none'} onValueChange={(v) => setSettings({...settings, courierConfig: {...(settings?.courierConfig || {}), activeProvider: v}})}>
-                      <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="steadfast">Steadfast</SelectItem>
-                        <SelectItem value="pathao">Pathao</SelectItem>
-                        <SelectItem value="redx">RedX</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="inside-dhaka" className="font-bold">Inside Dhaka (TK)</Label>
-                    <input id="inside-dhaka" type="number" value={settings?.deliveryChargeInsideDhaka || 0} onChange={(e) => setSettings({...settings, deliveryChargeInsideDhaka: Number(e.target.value)})} className="w-full h-12 rounded-xl border px-4" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="outside-dhaka" className="font-bold">Outside Dhaka (TK)</Label>
-                    <input id="outside-dhaka" type="number" value={settings?.deliveryChargeOutsideDhaka || 0} onChange={(e) => setSettings({...settings, deliveryChargeOutsideDhaka: Number(e.target.value)})} className="w-full h-12 rounded-xl border px-4" />
-                  </div>
-              </div>
-
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/20 p-4 rounded-2xl border">
-                 <div className="md:col-span-2 font-black text-xs uppercase opacity-50 mb-2">Provider Credentials</div>
-                  <div className="space-y-2">
-                    <Label htmlFor="steadfast-api-key" className="font-bold text-xs">Steadfast API Key</Label>
-                    <input id="steadfast-api-key" type="text" value={settings?.courierConfig?.steadfast?.apiKey || ''} onChange={(e) => setSettings({...settings, courierConfig: {...(settings?.courierConfig || {}), steadfast: {...(settings?.courierConfig?.steadfast || {}), apiKey: e.target.value}}})} className="w-full h-10 rounded-lg border px-3 text-xs" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="steadfast-secret-key" className="font-bold text-xs">Steadfast Secret Key</Label>
-                    <input id="steadfast-secret-key" type="text" value={settings?.courierConfig?.steadfast?.secretKey || ''} onChange={(e) => setSettings({...settings, courierConfig: {...(settings?.courierConfig || {}), steadfast: {...(settings?.courierConfig?.steadfast || {}), secretKey: e.target.value}}})} className="w-full h-10 rounded-lg border px-3 text-xs" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pathao-store-id" className="font-bold text-xs">Pathao Store ID</Label>
-                    <input id="pathao-store-id" value={settings?.courierConfig?.pathao?.storeId || ''} onChange={(e) => setSettings({...settings, courierConfig: {...(settings?.courierConfig || {}), pathao: {...(settings?.courierConfig?.pathao || {}), storeId: e.target.value}}})} className="w-full h-10 rounded-lg border px-3 text-xs" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="redx-api-key" className="font-bold text-xs">RedX API Key</Label>
-                    <input id="redx-api-key" type="text" value={settings?.courierConfig?.redx?.apiKey || ''} onChange={(e) => setSettings({...settings, courierConfig: {...(settings?.courierConfig || {}), redx: {...(settings?.courierConfig?.redx || {}), apiKey: e.target.value}}})} className="w-full h-10 rounded-lg border px-3 text-xs" />
-                  </div>
               </div>
            </CardContent>
         </Card>
@@ -819,9 +765,16 @@ export default function SuperConfigPage() {
                        <SelectValue />
                      </SelectTrigger>
                      <SelectContent className="rounded-xl">
-                       {TEMPLATE_OPTIONS.map(o => (
+                       {(template.id === 'navbar' || template.id === 'hero'
+                         ? [...TEMPLATE_OPTIONS, 'ghorer-bazar', 'falak']
+                         : TEMPLATE_OPTIONS
+                       ).map(o => (
                          <SelectItem key={o} value={o} className="rounded-lg">
-                           Version {o.toUpperCase()}
+                           {o === 'ghorer-bazar'
+                             ? 'Version Ghorer Bazar'
+                             : o === 'falak'
+                             ? 'Version Falak'
+                             : `Version ${o.toUpperCase()}`}
                          </SelectItem>
                        ))}
                      </SelectContent>

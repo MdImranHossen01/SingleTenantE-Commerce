@@ -74,12 +74,15 @@ export function HeroSlider({
 
   const activeStyle = (style || 'v1').toLowerCase();
   const isAarong = activeStyle === 'aarong';
+  const isGhorerBazar = activeStyle === 'ghorer-bazar';
+  const isFalak = activeStyle === 'falak';
+  const isImageOnlyHero = isAarong || isGhorerBazar || isFalak;
   const isV3 = activeStyle === 'v3';
   const isV4 = activeStyle === 'v4';
   const isV5 = activeStyle === 'v5';
   const isSingleBannerVersion = isV3 || isV5;
   const hasSubtitle = isV3 || isV5;
-  const hasSecondaryBtn = !isAarong && !isV5;
+  const hasSecondaryBtn = !isImageOnlyHero && !isV5;
 
   const safeIndex = isSingleBannerVersion
     ? 0
@@ -330,7 +333,7 @@ export function HeroSlider({
                 }}
               >
                 <LinkIcon className="mr-2 h-4 w-4" />
-                {isAarong ? 'Edit Direct Link' : 'Edit Link & Buttons'}
+                {isImageOnlyHero ? 'Edit Direct Link' : 'Edit Link & Buttons'}
               </DropdownMenuItem>
               {targetBanner?._id && (
                 <>
@@ -406,7 +409,7 @@ export function HeroSlider({
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder={
-                    isAarong
+                    isImageOnlyHero
                       ? 'e.g. Summer Collection'
                       : 'e.g. Fresh Healthy Food'
                   }
@@ -441,7 +444,7 @@ export function HeroSlider({
             )}
 
             {/* 4. Primary Button / Clickable Direct Link */}
-            {isAarong ? (
+            {isImageOnlyHero ? (
               <div className="space-y-1.5">
                 <Label htmlFor="hero-banner-direct-link">Clickable Direct Link (URL or Path)</Label>
                 <Input
