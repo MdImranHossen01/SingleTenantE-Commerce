@@ -5,6 +5,8 @@ import { ShopListingSelector } from '@/components/templates/ServerRegistry';
 
 import { Metadata } from 'next';
 
+export const revalidate = 31536000;
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getCachedSettings();
   const brandName = settings?.brandName || process.env.NEXT_PUBLIC_STORE_NAME || 'Store';
@@ -35,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ShopPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+export default async function ShopPage() {
   // Fetch initial data on the server with caching
   const [initialProducts, initialCategories, initialBrands, settings] = await Promise.all([
     getCachedProducts({}, 1000),
@@ -55,7 +57,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
         products={initialProducts}
         categories={initialCategories}
         brands={initialBrands}
-        searchParams={searchParams}
+        searchParams={{}}
       />
     </Suspense>
   );
