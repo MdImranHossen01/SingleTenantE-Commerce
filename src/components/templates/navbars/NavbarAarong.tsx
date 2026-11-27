@@ -519,7 +519,7 @@ export default function NavbarAarong() {
             {/* Mobile Actions — Right: Wishlist, Cart Drawer, Account */}
             <div className="hidden">
               {/* Wishlist Link */}
-              <Link
+              <Link prefetch={false}
                 href="/dashboard/wishlist"
                 className="relative p-1.5 text-foreground hover:text-primary transition-colors"
                 aria-label="Wishlist"
@@ -588,12 +588,12 @@ export default function NavbarAarong() {
                       {(session.user as any)?.role === 'super_admin' ? (
                         <>
                           <DropdownMenuItem asChild>
-                            <Link href="/admin/dashboard" className="cursor-pointer">
+                            <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                               <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href="/admin/system-design" className="cursor-pointer">
+                            <Link prefetch={false} href="/admin/system-design" className="cursor-pointer">
                               <Settings className="mr-2 h-4 w-4" /> Infrastructure &amp; Marketing
                             </Link>
                           </DropdownMenuItem>
@@ -601,12 +601,12 @@ export default function NavbarAarong() {
                       ) : (session.user as any)?.role === 'admin' ? (
                         <>
                           <DropdownMenuItem asChild>
-                            <Link href="/admin/dashboard" className="cursor-pointer">
+                            <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                               <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href="/admin/orders" className="cursor-pointer">
+                            <Link prefetch={false} href="/admin/orders" className="cursor-pointer">
                               <Truck className="mr-2 h-4 w-4" /> Manage Orders
                             </Link>
                           </DropdownMenuItem>
@@ -614,7 +614,7 @@ export default function NavbarAarong() {
                       ) : (
                         <>
                           <DropdownMenuItem asChild>
-                            <Link href="/dashboard" className="cursor-pointer">
+                            <Link prefetch={false} href="/dashboard" className="cursor-pointer">
                               <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                             </Link>
                           </DropdownMenuItem>
@@ -633,7 +633,7 @@ export default function NavbarAarong() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link
+                <Link prefetch={false}
                   href="/login"
                   className="p-1.5 text-foreground hover:text-primary transition-colors"
                   aria-label="Log in"
@@ -861,12 +861,12 @@ export default function NavbarAarong() {
                           {(session.user as any)?.role === 'super_admin' ? (
                             <>
                               <DropdownMenuItem asChild>
-                                <Link href="/admin/dashboard" className="cursor-pointer">
+                                <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                                   <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem asChild>
-                                <Link href="/admin/system-design" className="cursor-pointer">
+                                <Link prefetch={false} href="/admin/system-design" className="cursor-pointer">
                                   <Settings className="mr-2 h-4 w-4" /> Infrastructure &amp; Marketing
                                 </Link>
                               </DropdownMenuItem>
@@ -874,12 +874,12 @@ export default function NavbarAarong() {
                           ) : (session.user as any)?.role === 'admin' ? (
                             <>
                               <DropdownMenuItem asChild>
-                                <Link href="/admin/dashboard" className="cursor-pointer">
+                                <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                                   <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem asChild>
-                                <Link href="/admin/orders" className="cursor-pointer">
+                                <Link prefetch={false} href="/admin/orders" className="cursor-pointer">
                                   <Truck className="mr-2 h-4 w-4" /> Manage Orders
                                 </Link>
                               </DropdownMenuItem>
@@ -887,7 +887,7 @@ export default function NavbarAarong() {
                           ) : (
                             <>
                               <DropdownMenuItem asChild>
-                                <Link href="/dashboard" className="cursor-pointer">
+                                <Link prefetch={false} href="/dashboard" className="cursor-pointer">
                                   <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                                 </Link>
                               </DropdownMenuItem>
@@ -906,7 +906,7 @@ export default function NavbarAarong() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
-                    <Link
+                    <Link prefetch={false}
                       href="/login"
                       className="h-10 w-10 flex items-center justify-center rounded-xl transition-all cursor-pointer hover:text-primary"
                       aria-label="Log in"
@@ -1015,7 +1015,7 @@ export default function NavbarAarong() {
                     </div>
 
                     {/* Wishlist Link */}
-                    <Link href="/dashboard/wishlist" className="relative p-1.5 text-foreground hover:text-primary transition-colors">
+                    <Link prefetch={false} href="/dashboard/wishlist" className="relative p-1.5 text-foreground hover:text-primary transition-colors">
                       <Heart className="h-5 w-5" />
                       {wishlistCount > 0 && (
                         <span className="absolute top-0 right-0 h-4 min-w-[16px] px-1 bg-primary text-primary-foreground text-[9px] font-black rounded-full flex items-center justify-center animate-bounce shadow-md">
@@ -1086,12 +1086,12 @@ export default function NavbarAarong() {
                               {(session.user as any)?.role === 'super_admin' ? (
                                 <>
                                   <DropdownMenuItem asChild>
-                                    <Link href="/admin/dashboard" className="cursor-pointer">
+                                    <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                                       <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                                     </Link>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem asChild>
-                                    <Link href="/admin/system-design" className="cursor-pointer">
+                                    <Link prefetch={false} href="/admin/system-design" className="cursor-pointer">
                                       <Settings className="mr-2 h-4 w-4" /> Infrastructure &amp; Marketing
                                     </Link>
                                   </DropdownMenuItem>
@@ -1099,12 +1099,12 @@ export default function NavbarAarong() {
                               ) : (session.user as any)?.role === 'admin' ? (
                                 <>
                                   <DropdownMenuItem asChild>
-                                    <Link href="/admin/dashboard" className="cursor-pointer">
+                                    <Link prefetch={false} href="/admin/dashboard" className="cursor-pointer">
                                       <LayoutDashboard className="mr-2 h-4 w-4" /> Admin Dashboard
                                     </Link>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem asChild>
-                                    <Link href="/admin/orders" className="cursor-pointer">
+                                    <Link prefetch={false} href="/admin/orders" className="cursor-pointer">
                                       <Truck className="mr-2 h-4 w-4" /> Manage Orders
                                     </Link>
                                   </DropdownMenuItem>
@@ -1112,7 +1112,7 @@ export default function NavbarAarong() {
                               ) : (
                                 <>
                                   <DropdownMenuItem asChild>
-                                    <Link href="/dashboard" className="cursor-pointer">
+                                    <Link prefetch={false} href="/dashboard" className="cursor-pointer">
                                       <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                                     </Link>
                                   </DropdownMenuItem>
@@ -1131,7 +1131,7 @@ export default function NavbarAarong() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
-                        <Link
+                        <Link prefetch={false}
                           href="/login"
                           className="p-1.5 flex items-center justify-center rounded-lg transition-all cursor-pointer hover:text-primary"
                           aria-label="Log in"

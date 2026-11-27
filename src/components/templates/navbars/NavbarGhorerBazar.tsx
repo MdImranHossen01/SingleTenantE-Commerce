@@ -409,7 +409,7 @@ export default function NavbarGhorerBazar() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link
+                <Link prefetch={false}
                   href="/login"
                   className="flex flex-col items-center gap-0.5 text-foreground/80 hover:text-primary transition-colors"
                 >
@@ -418,7 +418,7 @@ export default function NavbarGhorerBazar() {
                 </Link>
               )}
 
-              <Link
+              <Link prefetch={false}
                 href="/dashboard/wishlist"
                 className="hidden xs:flex sm:flex flex-col items-center gap-0.5 text-foreground/80 hover:text-primary transition-colors relative"
               >

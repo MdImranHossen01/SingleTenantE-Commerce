@@ -371,7 +371,7 @@ export default function NavbarFalak() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Link
+                  <Link prefetch={false}
                     href="/login"
                     aria-label="Sign in"
                     className="group flex flex-col items-center gap-[6px] text-muted-foreground no-underline duration-150"
