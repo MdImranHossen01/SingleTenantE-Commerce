@@ -15,6 +15,55 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
+    // Auto-sync any paid client bills (e.g. upfront/legacy bills) that don't yet have an Income record
+    try {
+      const Bill = (await import('@/models/Bill')).default;
+      const paidBills = await Bill.find({
+        $or: [{ documentType: 'bill' }, { documentType: { $exists: false } }],
+        cashIn: { $gt: 0 },
+      }).lean();
+
+      if (paidBills.length > 0) {
+        const existingBillExpenses = await Expense.find({
+          type: 'income',
+          category: 'Receive Client Bill',
+        })
+          .select('title description')
+          .lean();
+
+        const missingEntries = paidBills
+          .filter((b: any) => {
+            if (!b.invoiceNo) return false;
+            return !existingBillExpenses.some(
+              (e: any) =>
+                (e.title && e.title.includes(b.invoiceNo)) ||
+                (e.description && e.description.includes(b.invoiceNo))
+            );
+          })
+          .map((b: any) => {
+            const netCashIn = b.gTotal > 0 ? Math.min(Number(b.cashIn) || 0, Number(b.gTotal)) : Number(b.cashIn) || 0;
+            return {
+              title: `Bill Payment: ${b.invoiceNo} - ${b.clientName}`,
+              amount: netCashIn,
+              category: 'Receive Client Bill',
+              type: 'income',
+              date: b.date || b.createdAt || new Date(),
+              description: `Received payment from ${b.clientName} for Bill #${b.invoiceNo}`,
+              status: 'Approved',
+              customerPhone: b.clientPhone,
+              accountCode: 'CASH',
+            };
+          })
+          .filter((e: any) => e.amount > 0);
+
+        if (missingEntries.length > 0) {
+          await Expense.insertMany(missingEntries);
+        }
+      }
+    } catch (syncErr) {
+      console.error('Error syncing paid bills to expenses-incomes:', syncErr);
+    }
+
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category');
     const type = searchParams.get('type');

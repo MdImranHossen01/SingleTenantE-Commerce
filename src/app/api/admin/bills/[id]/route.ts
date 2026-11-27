@@ -125,7 +125,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Log payment updates to ledger
     const paymentReceived = (bill.cashIn || 0) - prevCashInValue;
-    if (paymentReceived > 0 && bill.documentType === 'bill') {
+    if (paymentReceived > 0 && (!bill.documentType || bill.documentType === 'bill')) {
       try {
         const { logLedgerTransaction } = await import('@/lib/ledgerHelper');
         // Debit Cash by the payment amount
@@ -144,6 +144,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           `Payment credit for Bill ${bill.invoiceNo}`,
           bill.invoiceNo
         );
+
+        // Record payment in Expenses & Incomes
+        const Expense = (await import('@/models/Expense')).default;
+        await Expense.create({
+          title: `Bill Payment: ${bill.invoiceNo} - ${bill.clientName}`,
+          amount: paymentReceived,
+          category: 'Receive Client Bill',
+          type: 'income',
+          date: new Date(),
+          description: `Received payment from ${bill.clientName} for Bill #${bill.invoiceNo}`,
+          status: 'Approved',
+          customerPhone: bill.clientPhone,
+          accountCode: 'CASH',
+        });
       } catch (err) {
         console.error('Error logging to ledger:', err);
       }

@@ -313,6 +313,28 @@ export async function POST(req: NextRequest) {
             undefined,
             dbSession
           );
+
+          // Record upfront payment in Expenses & Incomes
+          const netCashIn = gTotal > 0 ? Math.min(cashIn, gTotal) : cashIn;
+          if (netCashIn > 0) {
+            const Expense = (await import('@/models/Expense')).default;
+            await Expense.create(
+              [
+                {
+                  title: `Bill Payment: ${invoiceNo} - ${clientName}`,
+                  amount: netCashIn,
+                  category: 'Receive Client Bill',
+                  type: 'income',
+                  date: new Date(),
+                  description: `Received upfront payment from ${clientName} for Bill #${invoiceNo}`,
+                  status: 'Approved',
+                  customerPhone: clientPhone,
+                  accountCode: 'CASH',
+                },
+              ],
+              { session: dbSession }
+            );
+          }
         }
       } catch (err) {
         console.error('Error logging to ledger:', err);
